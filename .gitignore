@@ -1,0 +1,32 @@
+# ── Frontend ──────────────────────────────────────────────
+node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.production
+
+# ── Backend ───────────────────────────────────────────────
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+
+# ── ML Service ────────────────────────────────────────────
+ml-service/__pycache__/
+ml-service/**/__pycache__/
+ml-service/*.pyc
+ml-service/**/*.pyc
+ml-service/venv/
+ml-service/.venv/
+
+# ── Secrets — never commit these ─────────────────────────
+.env
+*.env
+ml-service/.env
+
+# ── IDE / OS ──────────────────────────────────────────────
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+.vscode/settings.json
