@@ -23,10 +23,12 @@ ml-service/.venv/
 .env
 *.env
 ml-service/.env
+backend/.env
+*.properties.local
 
 # ── IDE / OS ──────────────────────────────────────────────
 .idea/
 *.iml
 .DS_Store
 Thumbs.db
-.vscode/settings.json
+.vscode/
