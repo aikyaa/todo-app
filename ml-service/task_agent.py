@@ -43,7 +43,8 @@ class TaskAnalysis(BaseModel):
         )
     )
 
-    priority: Literal["LOW", "MEDIUM", "HIGH", "URGENT"] = Field(
+    priority: Optional[Literal["LOW", "MEDIUM", "HIGH", "URGENT"]] = Field(
+        "MEDIUM",
         description=(
             "Priority level. If user explicitly states a priority use it directly. "
             "Otherwise infer from deadline and context: "
@@ -54,7 +55,8 @@ class TaskAnalysis(BaseModel):
         )
     )
 
-    category: Literal["WORK", "PERSONAL", "HEALTH", "FINANCE", "LEARNING", "OTHER"] = Field(
+    category: Optional[Literal["WORK", "PERSONAL", "HEALTH", "FINANCE", "LEARNING", "OTHER"]] = Field(
+        "OTHER",
         description=(
             "Category of the task. Choose the single best fit: "
             "WORK = job, meetings, reports, code, emails, projects; "

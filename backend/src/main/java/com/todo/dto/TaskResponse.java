@@ -30,7 +30,7 @@ public class TaskResponse {
                 .deadline(t.getDeadline())
                 .status(t.getStatus().name())
                 .category(t.getCategory())
-                .priority(t.getPriority() != null ? t.getPriority().name() : null)
+                .priority(t.getPriority().name())
                 .enriched(t.isEnriched())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())

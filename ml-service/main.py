@@ -70,7 +70,8 @@ def _run_worker():
                 messages = receiver.receive_messages(max_message_count=1, max_wait_time=30)
                 for message in messages:
                     try:
-                        _process_message(str(message))
+                        body = b"".join(message.body).decode("utf-8")
+                        _process_message(body)
                         receiver.complete_message(message)
                     except Exception as e:
                         logger.error("Failed to process message: %s", e, exc_info=True)

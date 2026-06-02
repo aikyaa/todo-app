@@ -15,8 +15,7 @@ public class AzureServiceBusConfig {
     @Value("${azure.servicebus.queue-name}")
     private String queueName;
 
-    // ServiceBusSenderClient — used by AzureQueueService to send messages
-    // Shared singleton bean — thread-safe, reuse across all requests
+    // Shared singleton bean used by TaskQueueService to send messages
     @Bean
     public ServiceBusSenderClient serviceBusSenderClient() {
         return new ServiceBusClientBuilder()
