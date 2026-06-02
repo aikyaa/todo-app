@@ -162,8 +162,7 @@ export default function App() {
     }
   };
 
-  // server already returns filtered tasks — client-side filter only needed for ALL
-  const displayed = filter === 'ALL' ? tasks : tasks.filter(t => t.status === filter);
+  const displayed = tasks;
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px', fontFamily: 'sans-serif' }}>

@@ -10,7 +10,7 @@ import os
 import threading
 
 import requests
-from azure.servicebus import ServiceBusClient, ServiceBusMessage
+from azure.servicebus import ServiceBusClient
 from azure.servicebus._common.constants import ServiceBusReceiveMode
 
 from agents.extraction_agent import extract_task_details
