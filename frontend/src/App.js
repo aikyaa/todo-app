@@ -85,11 +85,11 @@ export default function App() {
 
   useEffect(() => {
     tasks.forEach(t => {
-      if (t.title === 'Processing…' && !pollingRef.current[t.id]) {
+      if (!t.enriched && !pollingRef.current[t.id]) {
         pollingRef.current[t.id] = setInterval(async () => {
           try {
             const res = await getTask(t.id);
-            if (res.data.title !== 'Processing…') {
+            if (res.data.enriched) {
               clearInterval(pollingRef.current[t.id]);
               delete pollingRef.current[t.id];
               setTasks(prev => prev.map(p => p.id === t.id ? res.data : p));
@@ -237,8 +237,8 @@ export default function App() {
           ) : (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: 600, fontSize: 16, color: task.title === 'Processing…' ? '#94a3b8' : '#111' }}>
-                  {task.title === 'Processing…' ? '⏳ Processing…' : task.title}
+                <span style={{ fontWeight: 600, fontSize: 16, color: !task.enriched ? '#94a3b8' : '#111' }}>
+                  {!task.enriched ? `⏳ ${task.title}` : task.title}
                 </span>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {task.priority && <Badge label={task.priority} color={priorityColor(task.priority)} />}

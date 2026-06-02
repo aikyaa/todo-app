@@ -44,6 +44,10 @@ public class Task {
     @Builder.Default
     private Priority priority = Priority.MEDIUM;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean enriched = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

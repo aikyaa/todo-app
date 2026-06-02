@@ -24,17 +24,22 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final TaskQueueService queueService;
 
-    // Save skeleton task immediately, then enqueue for async AI enrichment
     @Transactional
     public TaskResponse create(String rawInput, String userId) {
         Task task = Task.builder()
-                .title("Processing…")
+                .title(quickTitle(rawInput))
                 .rawInput(rawInput)
                 .userId(userId)
                 .build();
         task = taskRepository.save(task);
         queueService.enqueue(new QueuedTaskPayload(task.getId(), rawInput));
         return TaskResponse.from(task);
+    }
+
+    // Extract first sentence or first 60 chars as a quick title — no LLM needed
+    private String quickTitle(String rawInput) {
+        String first = rawInput.split("[.!?,]")[0].trim();
+        return first.length() > 60 ? first.substring(0, 60) + "…" : first;
     }
 
     public List<TaskResponse> getAll(String userId) {
@@ -119,6 +124,7 @@ public class TaskService {
             catch (Exception ignored) {}
         }
 
+        task.setEnriched(true);
         taskRepository.save(task);
         log.info("Task {} enriched: title='{}' status={} category={} priority={}",
                 taskId, task.getTitle(), task.getStatus(), task.getCategory(), task.getPriority());

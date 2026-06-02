@@ -17,6 +17,7 @@ public class TaskResponse {
     private String status;
     private String category;
     private String priority;
+    private boolean enriched;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -30,6 +31,7 @@ public class TaskResponse {
                 .status(t.getStatus().name())
                 .category(t.getCategory())
                 .priority(t.getPriority() != null ? t.getPriority().name() : null)
+                .enriched(t.isEnriched())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
                 .build();
