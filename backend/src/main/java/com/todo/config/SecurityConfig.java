@@ -35,17 +35,10 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)          // disabled — we use JWT not sessions
                 .cors(cors -> {})                               // CORS handled by @CrossOrigin on controllers
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/auth/**",            // register and login are public
-                                "/swagger-ui/**",      // Swagger UI
-                                "/swagger-ui.html",
-                                "/api-docs/**",        // OpenAPI JSON spec
-                                "/h2-console/**"       // H2 browser console
-                        ).permitAll()
-                        .anyRequest().authenticated()           // everything else requires a valid JWT
+                        .requestMatchers("/auth/**").permitAll()  // register and login are public
+                        .anyRequest().authenticated()             // everything else requires a valid JWT
                 )
-                .headers(h -> h.frameOptions(fo -> fo.disable())) // allow H2 console iframe
-                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // no sessions — JWT only
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class) // run JWT filter before Spring's default auth filter
                 .build();

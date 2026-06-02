@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 @RestControllerAdvice
+//controller advice : common error handling for all controllers
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(NoSuchElementException.class)

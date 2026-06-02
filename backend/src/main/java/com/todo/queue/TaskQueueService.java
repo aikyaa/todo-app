@@ -1,26 +1,31 @@
 package com.todo.queue;
 
+import com.azure.messaging.servicebus.ServiceBusMessage;
+import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.todo.dto.QueuedTaskPayload;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class TaskQueueService {
 
-    // Thread-safe in-memory queue — HTTP thread writes, worker thread reads
-    private final BlockingQueue<QueuedTaskPayload> queue = new LinkedBlockingQueue<>();
+    private final ServiceBusSenderClient senderClient;
+    private final ObjectMapper objectMapper; // Spring Boot auto-configures this Jackson bean
 
+    // Serialize the payload to JSON and send it as a Service Bus message
     public void enqueue(QueuedTaskPayload payload) {
-        queue.offer(payload);
-        log.info("Queued task {}", payload.getTaskId());
-    }
-
-    // Blocks the calling thread until an item is available
-    public QueuedTaskPayload take() throws InterruptedException {
-        return queue.take();
+        try {
+            String json = objectMapper.writeValueAsString(payload);
+            senderClient.sendMessage(new ServiceBusMessage(json));
+            log.info("Queued task {} to Azure Service Bus", payload.getTaskId());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize task payload: " + e.getMessage(), e);
+        }
     }
 }
+

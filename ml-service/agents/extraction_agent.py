@@ -1,8 +1,3 @@
-"""
-LangChain extraction agent.
-Uses structured output (OpenAI function calling) for reliable field extraction.
-"""
-
 import os
 import logging
 from datetime import date
@@ -15,7 +10,7 @@ from dotenv import load_dotenv
 _env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=_env_path, override=True)
 
-from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
@@ -72,13 +67,13 @@ _PROMPT = ChatPromptTemplate.from_messages([
 
 
 def _get_llm():
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise EnvironmentError(
-            f"GROQ_API_KEY is not set. Looked for .env at: {_env_path}"
+            f"OPENAI_API_KEY is not set. Looked for .env at: {_env_path}"
         )
-    logger.info("GROQ_API_KEY loaded (length=%d)", len(api_key))
-    return ChatGroq(model="llama-3.1-8b-instant", temperature=0, api_key=api_key)
+    logger.info("OPENAI_API_KEY loaded (length=%d)", len(api_key))
+    return ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
 
 
 def extract_task_details(raw_input: str) -> dict:

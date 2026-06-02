@@ -3,18 +3,15 @@ server:
 
 spring:
   datasource:
-    url:               jdbc:h2:mem:tododb;DB_CLOSE_DELAY=-1 #delay -1 retains data even when connections are lost
-    driver-class-name: org.h2.Driver
-    username:          sa
-    password:
-  h2:
-    console:
-      enabled: true       # browse DB at http://localhost:8080/h2-console
+    url:               ${SPRING_DATASOURCE_URL}
+    username:          ${DB_USERNAME}
+    password:          ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: create-drop #create at start destroy at end
+      ddl-auto: update  # creates tables on first run, preserves data on restart
     show-sql: true
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
 
 app:
   ml-service:
@@ -23,13 +20,9 @@ app:
     secret: ${JWT_SECRET:todoai-default-secret-key-change-in-production-must-be-long}
     expiration-ms: 86400000 # 24 hours
 
-# Springdoc OpenAPI configuration
-springdoc:
-  api-docs:
-    path: /api-docs              # raw OpenAPI JSON spec available at http://localhost:8080/api-docs
-  swagger-ui:
-    path: /swagger-ui.html       # Swagger UI available at http://localhost:8080/swagger-ui.html
-    operations-sorter: method    # sort endpoints by HTTP method (GET, POST, PUT, DELETE)
-    tags-sorter: alpha           # sort tag groups alphabetically
-    display-request-duration: true  # show how long each request took in Swagger UI
-  show-actuator: false           # don't expose Spring Actuator endpoints in the docs
+# Azure Service Bus — set these as environment variables, never hardcode connection strings
+azure:
+  servicebus:
+    connection-string: ${AZURE_SERVICEBUS_CONNECTION_STRING:}
+    queue-name: ${AZURE_SERVICEBUS_QUEUE_NAME:task-queue}
+

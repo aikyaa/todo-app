@@ -1,10 +1,3 @@
-"""
-FastAPI ML microservice
-  POST /extract    — LangChain NLP extraction of task fields
-  POST /categorize — LangGraph auto-category + priority recommendation
-  GET  /debug      — sanity-check: confirms API key is loaded and LLM is reachable
-"""
-
 import logging
 import os
 from pathlib import Path
@@ -74,18 +67,17 @@ def health():
 
 @app.get("/debug")
 def debug():
-    """Quick sanity-check: is the API key loaded? Can we reach Groq?"""
-    api_key = os.getenv("GROQ_API_KEY")
+    """Quick sanity-check: is the API key loaded? Can we reach OpenAI?"""
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise HTTPException(
             status_code=500,
-            detail=f"GROQ_API_KEY not set. Looked for .env at: {_env_path}"
+            detail=f"OPENAI_API_KEY not set. Looked for .env at: {_env_path}"
         )
 
-    # Light test: call the LLM with a trivial prompt
     try:
-        from langchain_groq import ChatGroq
-        llm    = ChatGroq(model="llama-3.1-8b-instant", temperature=0, api_key=api_key)
+        from langchain_openai import ChatOpenAI
+        llm    = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
         result = llm.invoke("Reply with the single word: OK")
         return {
             "api_key_loaded": True,

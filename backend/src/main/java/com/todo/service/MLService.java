@@ -14,7 +14,7 @@ public class MLService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${app.ml-service.url}")
+    @Value("${app.ml-service.url}") //from application.yml (config)
     private String mlServiceUrl;
 
     // POST /extract — returns { task, description, deadline, status, priority_hint }
@@ -22,6 +22,7 @@ public class MLService {
     public Map<String, Object> extract(String rawInput) {
         try {
             HttpEntity<Map<String, Object>> req = new HttpEntity<>(Map.of("raw_input", rawInput), jsonHeaders());
+            //map.class tells Jackson to convert JSON to map
             ResponseEntity<Map> res = restTemplate.postForEntity(mlServiceUrl + "/extract", req, Map.class);
             return res.getBody() != null ? res.getBody() : Map.of();
         } catch (Exception e) {

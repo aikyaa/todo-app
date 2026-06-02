@@ -34,8 +34,8 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.h2database</groupId>
-      <artifactId>h2</artifactId>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -49,17 +49,23 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- OpenAPI / Swagger UI — generates docs at /swagger-ui.html and /api-docs -->
-    <dependency>
-      <groupId>org.springdoc</groupId>
-      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-      <version>2.3.0</version>
-    </dependency>
-
     <!-- Spring Security — authentication and request filtering -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
+    <!-- Azure Service Bus — persistent cloud message queue -->
+    <dependency>
+      <groupId>com.azure</groupId>
+      <artifactId>azure-messaging-servicebus</artifactId>
+      <version>7.15.0</version>
+    </dependency>
+
+    <!-- Jackson — serialize QueuedTaskPayload to/from JSON for Service Bus messages -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
     </dependency>
 
     <!-- JJWT — create and validate JWT tokens -->

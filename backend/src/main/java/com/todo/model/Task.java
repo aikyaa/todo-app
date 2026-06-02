@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-@Entity
+@Entity //tells hibernate that this class maps to a database table
 @Table(name = "tasks")
 @Getter @Setter
 @NoArgsConstructor  // required by JPA
@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Builder
 public class Task {
 
-    @Id
+    @Id //primary key
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 

@@ -1,12 +1,12 @@
 import axios from 'axios';
 
-// ── Auth API (no token needed) ────────────────────────────────────────────────
+// Auth API (no token needed) 
 const AUTH = axios.create({ baseURL: 'http://localhost:8080/auth' });
 
 export const register = (name, email, password) => AUTH.post('/register', { name, email, password });
 export const login    = (email, password)        => AUTH.post('/login',    { email, password });
 
-// ── Task API (JWT required) ───────────────────────────────────────────────────
+// Task API (JWT required)
 const API = axios.create({ baseURL: 'http://localhost:8080/api' });
 
 // Interceptor — attaches the JWT token from localStorage to every task request
