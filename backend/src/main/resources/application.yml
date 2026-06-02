@@ -19,6 +19,9 @@ spring:
 app:
   ml-service:
     url: ${ML_SERVICE_URL:http://localhost:8000}
+  jwt:
+    secret: ${JWT_SECRET:todoai-default-secret-key-change-in-production-must-be-long}
+    expiration-ms: 86400000 # 24 hours
 
 # Springdoc OpenAPI configuration
 springdoc:

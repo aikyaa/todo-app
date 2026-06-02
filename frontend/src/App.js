@@ -1,26 +1,87 @@
 import { useState, useEffect, useCallback } from 'react';
-import { createTask, getAllTasks, getTask, updateTask, deleteTask } from './services/api';
+import { createTask, getAllTasks, getTask, updateTask, deleteTask, login, register } from './services/api';
 
 const STATUSES = ['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED'];
-const POLL_MS  = 3000; // how often (ms) to check if a "Processing…" task has been enriched
+const POLL_MS  = 3000;
 
 export default function App() {
-  // Core state
-  const [tasks,    setTasks]    = useState([]);   // all tasks currently displayed
-  const [filter,   setFilter]   = useState('ALL'); // active status filter tab
-  const [input,    setInput]    = useState('');    // text in the create input box
-  const [loading,  setLoading]  = useState(false); // disables Add button while creating
-  const [error,    setError]    = useState('');    // error message shown below the form
+  // Auth state — token comes from localStorage so it persists across page refreshes
+  const [token,    setToken]    = useState(localStorage.getItem('token'));
+  const [authMode, setAuthMode] = useState('login');   // 'login' or 'register'
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
+  const [authError, setAuthError] = useState('');
 
-  // Edit state — only one task can be in edit mode at a time
-  const [editId,   setEditId]   = useState(null);  // ID of task being edited, null = no edit
-  const [editData, setEditData] = useState({});     // copy of the task fields in the edit form
+  // Core state
+  const [tasks,    setTasks]    = useState([]);
+  const [filter,   setFilter]   = useState('ALL');
+  const [input,    setInput]    = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState('');
+
+  // Edit state
+  const [editId,   setEditId]   = useState(null);
+  const [editData, setEditData] = useState({});
 
   // Plain object used as a map of taskId → interval ID for polling
   // Not in useState because changes to it shouldn't trigger re-renders
   const pollingRef = {};
 
   // Fetches tasks from the backend based on the current filter tab
+  // ── Auth handlers ──────────────────────────────────────────────────────────
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      const res = authMode === 'login'
+        ? await login(authForm.email, authForm.password)
+        : await register(authForm.name, authForm.email, authForm.password);
+      localStorage.setItem('token', res.data.token);
+      setToken(res.data.token);
+    } catch (e) {
+      setAuthError(e.response?.data?.error || 'Something went wrong');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setTasks([]);
+  };
+
+  // Show login/register screen if not authenticated
+  if (!token) {
+    return (
+      <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 16px', fontFamily: 'sans-serif' }}>
+        <h1 style={{ marginBottom: 4 }}>📝 TodoAI</h1>
+        <p style={{ color: '#666', marginBottom: 24 }}>{authMode === 'login' ? 'Sign in to continue' : 'Create an account'}</p>
+        <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {authMode === 'register' && (
+            <input placeholder="Name" value={authForm.name}
+              onChange={e => setAuthForm(p => ({ ...p, name: e.target.value }))} style={inputSt} />
+          )}
+          <input placeholder="Email" type="email" value={authForm.email}
+            onChange={e => setAuthForm(p => ({ ...p, email: e.target.value }))} style={inputSt} />
+          <input placeholder="Password" type="password" value={authForm.password}
+            onChange={e => setAuthForm(p => ({ ...p, password: e.target.value }))} style={inputSt} />
+          {authError && <p style={{ color: 'red', margin: 0 }}>{authError}</p>}
+          <button type="submit" style={{ ...btnSt, background: '#2563eb', padding: '10px' }}>
+            {authMode === 'login' ? 'Sign In' : 'Register'}
+          </button>
+        </form>
+        <p style={{ marginTop: 16, color: '#666', fontSize: 14 }}>
+          {authMode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+          <span onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError(''); }}
+            style={{ color: '#2563eb', cursor: 'pointer' }}>
+            {authMode === 'login' ? 'Register' : 'Sign In'}
+          </span>
+        </p>
+      </div>
+    );
+  }
+
+  // ── Task handlers ───────────────────────────────────────────────────────────
+
   // useCallback memoizes the function so it doesn't get recreated on every render
   const load = useCallback(async () => {
     try {
@@ -130,7 +191,10 @@ export default function App() {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px', fontFamily: 'sans-serif' }}>
-      <h1 style={{ marginBottom: 4 }}>📝 TodoAI</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <h1 style={{ margin: 0 }}>📝 TodoAI</h1>
+        <button onClick={handleLogout} style={{ ...btnSt, background: '#6b7280', fontSize: 12 }}>Sign Out</button>
+      </div>
       <p style={{ color: '#666', marginBottom: 24 }}>
         Describe a task in plain English — AI will extract the details.
       </p>

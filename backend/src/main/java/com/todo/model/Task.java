@@ -16,6 +16,10 @@ public class Task {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    // Owner of this task — set on creation, never changes
+    @Column(name = "user_id", nullable = false)
+    private String userId;
+
     @Column(nullable = false)
     private String title;
 

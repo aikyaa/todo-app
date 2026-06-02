@@ -26,38 +26,43 @@ public class TaskService {
 
     // Save skeleton task immediately, then enqueue for async AI enrichment
     @Transactional
-    public TaskResponse create(String rawInput) {
+    public TaskResponse create(String rawInput, String userId) {
         Task task = Task.builder()
                 .title("Processing…")
                 .rawInput(rawInput)
+                .userId(userId)
                 .build();
         task = taskRepository.save(task);
         queueService.enqueue(new QueuedTaskPayload(task.getId(), rawInput));
         return TaskResponse.from(task);
     }
 
-    public List<TaskResponse> getAll() {
-        return taskRepository.findAllByOrderByCreatedAtDesc()
+    public List<TaskResponse> getAll(String userId) {
+        return taskRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream().map(TaskResponse::from).collect(Collectors.toList());
     }
 
-    public List<TaskResponse> getByStatus(String status) {
+    public List<TaskResponse> getByStatus(String status, String userId) {
         Task.Status s = Task.Status.valueOf(status.toUpperCase());
-        return taskRepository.findByStatusOrderByCreatedAtDesc(s)
+        return taskRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, s)
                 .stream().map(TaskResponse::from).collect(Collectors.toList());
     }
 
-    public TaskResponse getOne(String id) {
-        return taskRepository.findById(id)
-                .map(TaskResponse::from)
+    public TaskResponse getOne(String id, String userId) {
+        Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Task not found: " + id));
+        if (!task.getUserId().equals(userId))
+            throw new NoSuchElementException("Task not found: " + id); // don't expose that it exists
+        return TaskResponse.from(task);
     }
 
     // Partial update — only non-null fields are applied
     @Transactional
-    public TaskResponse update(String id, TaskUpdateRequest req) {
+    public TaskResponse update(String id, TaskUpdateRequest req, String userId) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Task not found: " + id));
+        if (!task.getUserId().equals(userId))
+            throw new NoSuchElementException("Task not found: " + id);
 
         if (req.getTitle() != null)       task.setTitle(req.getTitle());
         if (req.getDescription() != null) task.setDescription(req.getDescription());
@@ -71,8 +76,10 @@ public class TaskService {
     }
 
     @Transactional
-    public void delete(String id) {
-        if (!taskRepository.existsById(id))
+    public void delete(String id, String userId) {
+        Task task = taskRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Task not found: " + id));
+        if (!task.getUserId().equals(userId))
             throw new NoSuchElementException("Task not found: " + id);
         taskRepository.deleteById(id);
     }

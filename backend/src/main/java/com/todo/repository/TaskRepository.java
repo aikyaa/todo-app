@@ -8,6 +8,6 @@ import java.util.List;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, String> {
-    List<Task> findAllByOrderByCreatedAtDesc();
-    List<Task> findByStatusOrderByCreatedAtDesc(Task.Status status);
+    List<Task> findByUserIdOrderByCreatedAtDesc(String userId);
+    List<Task> findByUserIdAndStatusOrderByCreatedAtDesc(String userId, Task.Status status);
 }

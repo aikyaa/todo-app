@@ -1,21 +1,24 @@
 import axios from 'axios';
 
-// Axios instance with the backend base URL pre-configured
-// All API calls go through this so the base URL is defined in one place
+// ── Auth API (no token needed) ────────────────────────────────────────────────
+const AUTH = axios.create({ baseURL: 'http://localhost:8080/auth' });
+
+export const register = (name, email, password) => AUTH.post('/register', { name, email, password });
+export const login    = (email, password)        => AUTH.post('/login',    { email, password });
+
+// ── Task API (JWT required) ───────────────────────────────────────────────────
 const API = axios.create({ baseURL: 'http://localhost:8080/api' });
 
-// POST /api/tasks — creates a new task from raw natural language input
+// Interceptor — attaches the JWT token from localStorage to every task request
+// Runs automatically before each request is sent
+API.interceptors.request.use(config => {
+    const token = localStorage.getItem('token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+});
+
 export const createTask  = (rawInput)  => API.post('/tasks', { rawInput });
-
-// GET /api/tasks          — fetch all tasks
-// GET /api/tasks?status=X — fetch only tasks with a specific status
-export const getAllTasks  = (status)   => API.get('/tasks', { params: status ? { status } : {} });
-
-// GET /api/tasks/:id — fetch a single task by ID (used by the polling loop)
+export const getAllTasks  = (status)    => API.get('/tasks', { params: status ? { status } : {} });
 export const getTask     = (id)        => API.get(`/tasks/${id}`);
-
-// PUT /api/tasks/:id — update one or more fields on an existing task
 export const updateTask  = (id, data)  => API.put(`/tasks/${id}`, data);
-
-// DELETE /api/tasks/:id — permanently remove a task
 export const deleteTask  = (id)        => API.delete(`/tasks/${id}`);
