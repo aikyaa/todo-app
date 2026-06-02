@@ -28,30 +28,28 @@ public class SecurityConfig {
     private final UserRepository userRepository;
     private final JwtFilter jwtFilter;
 
-    // Define which endpoints are public and which require authentication
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable)          // disabled — we use JWT not sessions
-                .cors(cors -> {})                               // CORS handled by @CrossOrigin on controllers
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> {})
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()  // register and login are public
-                        .anyRequest().authenticated()             // everything else requires a valid JWT
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/api/tasks/*/enrich").permitAll() // secured by X-Enrich-Secret header instead
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class) // run JWT filter before Spring's default auth filter
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
-    // Loads user from DB by email — used by Spring Security during authentication
     @Bean
     public UserDetailsService userDetailsService() {
         return email -> userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
     }
 
-    // Wires together UserDetailsService and PasswordEncoder for login validation
     @Bean
     public AuthenticationProvider authenticationProvider() {
         var provider = new DaoAuthenticationProvider();
@@ -60,13 +58,11 @@ public class SecurityConfig {
         return provider;
     }
 
-    // BCrypt hashes passwords — never store plaintext passwords
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Exposes AuthenticationManager as a bean so AuthService can use it to authenticate login requests
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();

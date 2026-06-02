@@ -4,20 +4,19 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-@Entity //tells hibernate that this class maps to a database table
+@Entity
 @Table(name = "tasks")
 @Getter @Setter
-@NoArgsConstructor  // required by JPA
-@AllArgsConstructor // required by @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class Task {
 
-    @Id //primary key
+    @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    // Owner of this task — set on creation, never changes
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, updatable = false)
     private String userId;
 
     @Column(nullable = false)

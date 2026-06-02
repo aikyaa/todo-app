@@ -1,5 +1,6 @@
 package com.todo.controller;
 
+import com.todo.dto.EnrichRequest;
 import com.todo.dto.TaskRequest;
 import com.todo.dto.TaskResponse;
 import com.todo.dto.TaskUpdateRequest;
@@ -7,19 +8,25 @@ import com.todo.model.User;
 import com.todo.service.TaskService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RestController //routes requests to methods of this class, JSON conversion
-@RequestMapping("/api/tasks") //adds prefix
-@CrossOrigin(origins = "http://localhost:3000") //allows frontend to call backend
+@RestController
+@RequestMapping("/api/tasks")
+@CrossOrigin(origins = "http://localhost:3000")
 @RequiredArgsConstructor
 public class TaskController {
 
     private final TaskService taskService;
+
+    // Shared secret Python must send in X-Enrich-Secret header
+    @Value("${app.enrich-secret}")
+    private String enrichSecret;
 
     @PostMapping
     public ResponseEntity<TaskResponse> create(@Valid @RequestBody TaskRequest req,
@@ -35,7 +42,6 @@ public class TaskController {
         return ResponseEntity.ok(taskService.getAll(user.getId()));
     }
 
-    // @PathVariable extracts the id segment from the URL
     @GetMapping("/{id}")
     public ResponseEntity<TaskResponse> getOne(@PathVariable String id,
                                                @AuthenticationPrincipal User user) {
@@ -53,6 +59,18 @@ public class TaskController {
     public ResponseEntity<Void> delete(@PathVariable String id,
                                        @AuthenticationPrincipal User user) {
         taskService.delete(id, user.getId());
-        return ResponseEntity.noContent().build();//sets 204, success with no content
+        return ResponseEntity.noContent().build();
+    }
+
+    // Called by Python ML service after processing a task from the queue
+    // Secured by shared secret in X-Enrich-Secret header — not a user-facing endpoint
+    @PutMapping("/{id}/enrich")
+    public ResponseEntity<Void> enrich(@PathVariable String id,
+                                       @RequestHeader("X-Enrich-Secret") String secret,
+                                       @RequestBody EnrichRequest req) {
+        if (!enrichSecret.equals(secret))
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        taskService.enrich(id, req.getExtracted(), req.getCategorized());
+        return ResponseEntity.noContent().build();
     }
 }

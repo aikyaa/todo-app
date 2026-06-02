@@ -7,8 +7,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-//create a repo for entity Task with primary key type String
+//table with task entity and string primary key
 public interface TaskRepository extends JpaRepository<Task, String> {
-    List<Task> findByUserIdOrderByCreatedAtDesc(String userId); //spring data derives sql query from method name
+    List<Task> findByUserIdOrderByCreatedAtDesc(String userId);
     List<Task> findByUserIdAndStatusOrderByCreatedAtDesc(String userId, Task.Status status);
 }

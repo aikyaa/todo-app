@@ -14,7 +14,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-// Implements UserDetails so Spring Security can use this entity directly for authentication
 public class User implements UserDetails {
 
     @Id
@@ -25,16 +24,15 @@ public class User implements UserDetails {
     private String email;
 
     @Column(nullable = false)
-    private String password; // stored as bcrypt hash — never plaintext
+    private String password; // bcrypt hash — never plaintext
 
     @Column(nullable = false)
     private String name;
 
-    // No roles in this project — return empty list (all authenticated users have the same access)
     @Override public Collection<? extends GrantedAuthority> getAuthorities() { return List.of(); }
-    @Override public String getUsername() { return email; } // email is the unique identifier
-    @Override public boolean isAccountNonExpired()  { return true; }
-    @Override public boolean isAccountNonLocked()   { return true; }
-    @Override public boolean isCredentialsNonExpired() { return true; }
-    @Override public boolean isEnabled()            { return true; }
+    @Override public String getUsername()                  { return email; }
+    @Override public boolean isAccountNonExpired()         { return true; }
+    @Override public boolean isAccountNonLocked()          { return true; }
+    @Override public boolean isCredentialsNonExpired()     { return true; }
+    @Override public boolean isEnabled()                   { return true; }
 }
