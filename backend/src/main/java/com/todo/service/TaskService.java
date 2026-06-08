@@ -4,8 +4,10 @@ import com.todo.dto.*;
 import com.todo.model.Task;
 import com.todo.queue.TaskQueueService;
 import com.todo.repository.TaskRepository;
+import com.todo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,8 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final TaskQueueService queueService;
+    private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public TaskResponse create(String rawInput, String userId) {
@@ -128,5 +132,15 @@ public class TaskService {
         taskRepository.save(task);
         log.info("Task {} enriched: title='{}' status={} category={} priority={}",
                 taskId, task.getTitle(), task.getStatus(), task.getCategory(), task.getPriority());
+
+        // Push enriched task to the user's WebSocket session
+        userRepository.findById(task.getUserId()).ifPresent(user -> {
+            log.info("Pushing WebSocket update to user: {}", user.getEmail());
+            messagingTemplate.convertAndSendToUser(
+                    user.getEmail(),
+                    "/queue/tasks",
+                    TaskResponse.from(task)
+            );
+        });
     }
 }

@@ -36,6 +36,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
+      <version>42.7.3</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -47,6 +48,12 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
+    </dependency>
+
+    <!-- WebSocket — real-time push notifications to frontend -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-websocket</artifactId>
     </dependency>
 
     <!-- Spring Security — authentication and request filtering -->

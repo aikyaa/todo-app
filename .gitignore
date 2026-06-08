@@ -24,6 +24,7 @@ ml-service/.venv/
 *.env
 ml-service/.env
 backend/.env
+backend/run.ps1
 *.properties.local
 
 # ── IDE / OS ──────────────────────────────────────────────

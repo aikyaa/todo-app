@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
@@ -79,14 +79,21 @@ _PROMPT = ChatPromptTemplate.from_messages([
 
 
 def _get_llm():
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key  = os.getenv("OPENAI_API_KEY")
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "https://todo-app.openai.azure.com/")
+    deploy   = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4-mini")
     if not api_key:
         raise EnvironmentError(f"OPENAI_API_KEY is not set. Looked for .env at: {_env_path}")
-    return ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
+    return AzureChatOpenAI(
+        azure_endpoint=endpoint,
+        api_key=api_key,
+        azure_deployment=deploy,
+        api_version="2024-08-01-preview",
+        temperature=0,
+    )
 
 
 def analyze_task(raw_input: str) -> dict:
-    """Single LLM call — extracts title, description, deadline, status, category and priority."""
     llm    = _get_llm().with_structured_output(TaskAnalysis)
     result = (_PROMPT | llm).invoke({
         "raw_input": raw_input,

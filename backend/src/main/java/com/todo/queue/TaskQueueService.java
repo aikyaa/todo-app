@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 public class TaskQueueService {
 
     private final ServiceBusSenderClient senderClient;
-    private final ObjectMapper objectMapper; // Spring Boot auto-configures this Jackson bean
+    private final ObjectMapper objectMapper;
 
     // Serialize the payload to JSON and send it as a Service Bus message
     public void enqueue(QueuedTaskPayload payload) {

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createTask, getAllTasks, getTask, updateTask, deleteTask, login, register } from './services/api';
+import { createTask, getAllTasks, updateTask, deleteTask, login, register } from './services/api';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
 const STATUSES = ['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED'];
-const POLL_MS  = 3000;
 
 // Inject global CSS for hover/focus pseudo-classes and transitions
 const GLOBAL_CSS = `
@@ -133,7 +134,7 @@ export default function App() {
   const [editId,   setEditId]   = useState(null);
   const [editData, setEditData] = useState({});
 
-  const pollingRef = useRef({});
+  const stompRef = useRef(null);
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -145,7 +146,15 @@ export default function App() {
       localStorage.setItem('token', res.data.token);
       setToken(res.data.token);
     } catch (e) {
-      setAuthError(e.response?.data?.error || 'Something went wrong');
+      const status = e.response?.status;
+      const msg = e.response?.data?.error;
+      if (status === 401 || status === 403) {
+        setAuthError('Invalid email or password');
+      } else if (msg) {
+        setAuthError(msg);
+      } else {
+        setAuthError('Something went wrong');
+      }
     }
   };
 
@@ -155,66 +164,7 @@ export default function App() {
     setTasks([]);
   };
 
-  // ── Auth screen ───────────────────────────────────────────────────────────
-  if (!token) {
-    return (
-      <>
-        <GlobalStyles />
-        <div style={{
-          minHeight: '100vh', background: C.bg,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        }}>
-          <div style={{
-            background: C.surface, borderRadius: 16, padding: '40px 36px',
-            border: `1px solid ${C.border}`, width: '100%', maxWidth: 400,
-          }}>
-            <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>📝</div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.text }}>TodoAI</h1>
-              <p style={{ margin: '6px 0 0', color: C.textMuted, fontSize: 14 }}>
-                {authMode === 'login' ? 'Sign in to continue' : 'Create your account'}
-              </p>
-            </div>
-            <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {authMode === 'register' && (
-                <input className="auth-input" placeholder="Full name" value={authForm.name}
-                  onChange={e => setAuthForm(p => ({ ...p, name: e.target.value }))} style={authInputSt} />
-              )}
-              <input className="auth-input" placeholder="Email address" type="email" value={authForm.email}
-                onChange={e => setAuthForm(p => ({ ...p, email: e.target.value }))} style={authInputSt} />
-              <input className="auth-input" placeholder="Password" type="password" value={authForm.password}
-                onChange={e => setAuthForm(p => ({ ...p, password: e.target.value }))} style={authInputSt} />
-              {authError && (
-                <div style={{
-                  background: C.roseDim, border: `1px solid ${C.rose}33`,
-                  borderRadius: 8, padding: '10px 12px', color: C.rose, fontSize: 13,
-                }}>
-                  {authError}
-                </div>
-              )}
-              <button type="submit" className="auth-btn" style={{
-                padding: '11px', background: C.purple, color: C.bg,
-                border: 'none', borderRadius: 8, cursor: 'pointer',
-                fontSize: 14, fontWeight: 700, marginTop: 4,
-              }}>
-                {authMode === 'login' ? 'Sign In' : 'Create Account'}
-              </button>
-            </form>
-            <p style={{ textAlign: 'center', marginTop: 20, color: C.textMuted, fontSize: 13 }}>
-              {authMode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-              <span onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError(''); }}
-                style={{ color: C.purple, cursor: 'pointer', fontWeight: 500, transition: 'opacity 0.15s' }}>
-                {authMode === 'login' ? 'Register' : 'Sign In'}
-              </span>
-            </p>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── Task handlers ─────────────────────────────────────────────────────────
+  // ── Task hooks — must be before any conditional return ───────────────────
   const load = useCallback(async () => {
     try {
       const res = await getAllTasks(filter === 'ALL' ? null : filter);
@@ -222,29 +172,32 @@ export default function App() {
     } catch (e) { console.error(e); }
   }, [filter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (token) load(); }, [load, token]);
 
+  // WebSocket — connects once when logged in, receives enriched tasks pushed by backend
   useEffect(() => {
-    tasks.forEach(t => {
-      if (!t.enriched && !pollingRef.current[t.id]) {
-        pollingRef.current[t.id] = setInterval(async () => {
-          try {
-            const res = await getTask(t.id);
-            if (res.data.enriched) {
-              clearInterval(pollingRef.current[t.id]);
-              delete pollingRef.current[t.id];
-              setTasks(prev => prev.map(p => p.id === t.id ? res.data : p));
-            }
-          } catch {
-            clearInterval(pollingRef.current[t.id]);
-            delete pollingRef.current[t.id];
-          }
-        }, POLL_MS);
-      }
+    if (!token) return;
+
+    const client = new Client({
+      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      connectHeaders: { Authorization: `Bearer ${token}` },
+      onConnect: () => {
+        client.subscribe('/user/queue/tasks', message => {
+          const enrichedTask = JSON.parse(message.body);
+          setTasks(prev => prev.map(t => t.id === enrichedTask.id ? enrichedTask : t));
+        });
+        // fetch latest tasks in case any were enriched during connection setup
+        load();
+      },
+      onDisconnect: () => console.log('WebSocket disconnected'),
+      onStompError: frame => console.error('STOMP error', frame),
     });
-    // only clear on component unmount, not on every tasks change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks]);
+
+    client.activate();
+    stompRef.current = client;
+
+    return () => client.deactivate();
+  }, [token]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -300,6 +253,65 @@ export default function App() {
   };
 
   const statusLabel = s => ({ PENDING: 'Pending', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', ALL: 'All' }[s] || s);
+
+  // ── Auth screen ───────────────────────────────────────────────────────────
+  if (!token) {
+    return (
+      <>
+        <GlobalStyles />
+        <div style={{
+          minHeight: '100vh', background: C.bg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        }}>
+          <div style={{
+            background: C.surface, borderRadius: 16, padding: '40px 36px',
+            border: `1px solid ${C.border}`, width: '100%', maxWidth: 400,
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: 32 }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>📝</div>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.text }}>TodoAI</h1>
+              <p style={{ margin: '6px 0 0', color: C.textMuted, fontSize: 14 }}>
+                {authMode === 'login' ? 'Sign in to continue' : 'Create your account'}
+              </p>
+            </div>
+            <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {authMode === 'register' && (
+                <input className="auth-input" placeholder="Full name" value={authForm.name}
+                  onChange={e => setAuthForm(p => ({ ...p, name: e.target.value }))} style={authInputSt} />
+              )}
+              <input className="auth-input" placeholder="Email address" type="email" value={authForm.email}
+                onChange={e => setAuthForm(p => ({ ...p, email: e.target.value }))} style={authInputSt} />
+              <input className="auth-input" placeholder="Password" type="password" value={authForm.password}
+                onChange={e => setAuthForm(p => ({ ...p, password: e.target.value }))} style={authInputSt} />
+              {authError && (
+                <div style={{
+                  background: C.roseDim, border: `1px solid ${C.rose}33`,
+                  borderRadius: 8, padding: '10px 12px', color: C.rose, fontSize: 13,
+                }}>
+                  {authError}
+                </div>
+              )}
+              <button type="submit" className="auth-btn" style={{
+                padding: '11px', background: C.purple, color: C.bg,
+                border: 'none', borderRadius: 8, cursor: 'pointer',
+                fontSize: 14, fontWeight: 700, marginTop: 4,
+              }}>
+                {authMode === 'login' ? 'Sign In' : 'Create Account'}
+              </button>
+            </form>
+            <p style={{ textAlign: 'center', marginTop: 20, color: C.textMuted, fontSize: 13 }}>
+              {authMode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+              <span onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError(''); }}
+                style={{ color: C.purple, cursor: 'pointer', fontWeight: 500 }}>
+                {authMode === 'login' ? 'Register' : 'Sign In'}
+              </span>
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   // ── Main UI ───────────────────────────────────────────────────────────────
   return (
@@ -409,12 +421,12 @@ export default function App() {
                     onChange={e => setEditData(p => ({ ...p, description: e.target.value }))}
                     placeholder="Description" rows={2} style={{ ...inputSt, resize: 'vertical' }} />
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                    <select value={editData.status}
+                    <select aria-label="Status" value={editData.status}
                       onChange={e => setEditData(p => ({ ...p, status: e.target.value }))} style={selectSt}>
                       {['PENDING', 'IN_PROGRESS', 'COMPLETED'].map(s =>
                         <option key={s} value={s}>{statusLabel(s)}</option>)}
                     </select>
-                    <select value={editData.priority}
+                    <select aria-label="Priority" value={editData.priority}
                       onChange={e => setEditData(p => ({ ...p, priority: e.target.value }))} style={selectSt}>
                       {['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map(p => <option key={p}>{p}</option>)}
                     </select>
@@ -466,7 +478,7 @@ export default function App() {
                   )}
 
                   <div style={{ display: 'flex', alignItems: 'center', marginTop: 10, gap: 6 }}>
-                    <select value={task.status} onChange={e => handleStatusChange(task.id, e.target.value)}
+                    <select aria-label="Task status" value={task.status} onChange={e => handleStatusChange(task.id, e.target.value)}
                       style={{
                         ...selectSt, fontSize: 11, padding: '3px 8px',
                         color: statusColor(task.status), borderColor: statusColor(task.status) + '40',

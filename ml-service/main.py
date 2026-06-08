@@ -96,12 +96,20 @@ def health():
 
 @app.get("/debug")
 def debug():
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key  = os.getenv("OPENAI_API_KEY")
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "https://todo-app.openai.azure.com/")
+    deploy   = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4-mini")
     if not api_key:
         raise HTTPException(status_code=500, detail=f"OPENAI_API_KEY not set. Looked for .env at: {_env_path}")
     try:
-        from langchain_openai import ChatOpenAI
-        llm    = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
+        from langchain_openai import AzureChatOpenAI
+        llm    = AzureChatOpenAI(
+            azure_endpoint=endpoint,
+            api_key=api_key,
+            azure_deployment=deploy,
+            api_version="2024-08-01-preview",
+            temperature=0,
+        )
         result = llm.invoke("Reply with the single word: OK")
         return {"api_key_loaded": True, "api_key_length": len(api_key), "llm_response": result.content}
     except Exception as e:
