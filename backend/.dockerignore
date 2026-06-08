@@ -1,0 +1,6 @@
+target/
+*.class
+*.jar
+.mvn/
+run.ps1
+.env

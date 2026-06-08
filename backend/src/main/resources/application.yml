@@ -18,6 +18,8 @@ app:
     secret: ${JWT_SECRET:todoai-default-secret-key-change-in-production-must-be-long}
     expiration-ms: 10800000
   enrich-secret: ${ENRICH_SECRET:local-enrich-secret}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 azure:
   servicebus:

@@ -20,7 +20,7 @@ class TaskAnalysis(BaseModel):
 
     description: Optional[str] = Field(
         None,
-        description="One sentence detail about the task"
+        description="One sentence detail about the task. Write in direct task form — no references to 'the user', 'they', or 'you'. Example: 'Complete the quarterly report and send to the team' not 'The user wants to complete the quarterly report'."
     )
 
     deadline: Optional[str] = Field(

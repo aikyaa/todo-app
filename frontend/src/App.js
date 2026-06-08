@@ -179,7 +179,7 @@ export default function App() {
     if (!token) return;
 
     const client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      webSocketFactory: () => new SockJS((process.env.REACT_APP_API_URL || 'http://localhost:8080') + '/ws'),
       connectHeaders: { Authorization: `Bearer ${token}` },
       onConnect: () => {
         client.subscribe('/user/queue/tasks', message => {
