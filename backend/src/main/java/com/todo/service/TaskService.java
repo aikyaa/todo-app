@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
@@ -95,36 +94,34 @@ public class TaskService {
 
     // Called by queue worker after ML pipeline completes — replaces "Processing…" with enriched values
     @Transactional
-    public void enrich(String taskId, Map<String, Object> extracted, Map<String, Object> categorized) {
+    public void enrich(String taskId, EnrichRequest req) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new NoSuchElementException("Task not found: " + taskId));
 
-        if (extracted.get("task") != null)
-            task.setTitle((String) extracted.get("task"));
-        if (extracted.get("description") != null)
-            task.setDescription((String) extracted.get("description"));
+        if (req.getTask() != null)        task.setTitle(req.getTask());
+        if (req.getDescription() != null) task.setDescription(req.getDescription());
 
         // LLM may return full datetime or date-only — try both
-        if (extracted.get("deadline") instanceof String d && !d.isBlank()) {
+        if (req.getDeadline() != null && !req.getDeadline().isBlank()) {
             try {
-                task.setDeadline(LocalDateTime.parse(d));
+                task.setDeadline(LocalDateTime.parse(req.getDeadline()));
             } catch (Exception e1) {
                 try {
-                    task.setDeadline(LocalDate.parse(d).atTime(23, 59, 59));
+                    task.setDeadline(LocalDate.parse(req.getDeadline()).atTime(23, 59, 59));
                 } catch (Exception ignored) {
-                    log.warn("Could not parse deadline '{}' for task {}", d, taskId);
+                    log.warn("Could not parse deadline '{}' for task {}", req.getDeadline(), taskId);
                 }
             }
         }
 
-        if (extracted.get("status") instanceof String s && !s.isBlank()) {
-            try { task.setStatus(Task.Status.valueOf(s.toUpperCase())); } catch (Exception ignored) {}
+        if (req.getStatus() != null && !req.getStatus().isBlank()) {
+            try { task.setStatus(Task.Status.valueOf(req.getStatus().toUpperCase())); } catch (Exception ignored) {}
         }
 
-        if (categorized.get("category") != null)
-            task.setCategory((String) categorized.get("category"));
-        if (categorized.get("priority") != null) {
-            try { task.setPriority(Task.Priority.valueOf(((String) categorized.get("priority")).toUpperCase())); }
+        if (req.getCategory() != null)
+            task.setCategory(req.getCategory());
+        if (req.getPriority() != null) {
+            try { task.setPriority(Task.Priority.valueOf(req.getPriority().toUpperCase())); }
             catch (Exception ignored) {}
         }
 

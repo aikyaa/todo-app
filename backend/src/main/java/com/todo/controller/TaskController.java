@@ -70,7 +70,7 @@ public class TaskController {
                                        @RequestBody EnrichRequest req) {
         if (!enrichSecret.equals(secret))
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        taskService.enrich(id, req.getExtracted(), req.getCategorized());
+        taskService.enrich(id, req);
         return ResponseEntity.noContent().build();
     }
 }

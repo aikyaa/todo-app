@@ -33,8 +33,8 @@ public class JwtFilter extends OncePerRequestFilter {
 
         // Skip if no Bearer token present
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            chain.doFilter(request, response);
-            return;
+            chain.doFilter(request, response); //pass it on to the next filter in the chain
+            return; //exit this filter, rejected later by authorisation filter if required
         }
 
         String token = authHeader.substring(7); // strip "Bearer " prefix

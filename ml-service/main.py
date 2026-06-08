@@ -37,13 +37,9 @@ def _process_message(message_body: str):
 
     result = analyze_task(raw_input)
 
-    # split into extracted and categorized to match Java EnrichRequest shape
-    extracted   = {k: result[k] for k in ("task", "description", "deadline", "status")}
-    categorized = {k: result[k] for k in ("category", "priority")}
-
     response = requests.put(
         f"{java_url}/api/tasks/{task_id}/enrich",
-        json={"extracted": extracted, "categorized": categorized},
+        json=result,
         headers={"X-Enrich-Secret": enrich_secret},
         timeout=10,
     )
