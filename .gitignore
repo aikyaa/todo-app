@@ -19,6 +19,10 @@ ml-service/**/*.pyc
 ml-service/venv/
 ml-service/.venv/
 
+# ── Deployment & setup guides — contain infra details ────
+DEPLOY.md
+KEYVAULT_SETUP.md
+
 # ── Secrets — never commit these ─────────────────────────
 .env
 *.env

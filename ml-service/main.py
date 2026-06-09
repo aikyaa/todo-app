@@ -10,7 +10,7 @@ from azure.servicebus._common.constants import ServiceBusReceiveMode
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
-from task_agent import analyze_task
+from task_agent import analyze_task, _get_secret
 
 _env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=_env_path, override=True)
@@ -26,9 +26,9 @@ app = FastAPI()
 
 # ── Queue worker ───────────────────────────────────────────────────────────────
 
-# Read once at startup — these don't change at runtime
+# Read once at startup from Key Vault (if configured) or env vars
 _JAVA_URL      = os.getenv("JAVA_BACKEND_URL", "http://localhost:8080")
-_ENRICH_SECRET = os.getenv("ENRICH_SECRET", "local-enrich-secret")
+_ENRICH_SECRET = _get_secret("enrich-secret", "ENRICH_SECRET") or "local-enrich-secret"
 
 
 def _process_message(message_body: str):
@@ -51,11 +51,11 @@ def _process_message(message_body: str):
 
 
 def _run_worker():
-    connection_str = os.getenv("AZURE_SERVICEBUS_CONNECTION_STRING")
+    connection_str = _get_secret("servicebus-connection-string", "AZURE_SERVICEBUS_CONNECTION_STRING")
     queue_name     = os.getenv("AZURE_SERVICEBUS_QUEUE_NAME", "task-queue")
 
     if not connection_str:
-        logger.error("AZURE_SERVICEBUS_CONNECTION_STRING not set — queue worker will not start")
+        logger.error("Service Bus connection string not found in Key Vault or env — queue worker will not start")
         return
 
     logger.info("Queue worker starting on queue: %s", queue_name)
@@ -95,11 +95,11 @@ def health():
 
 @app.get("/debug")
 def debug():
-    api_key  = os.getenv("OPENAI_API_KEY")
+    api_key  = _get_secret("openai-api-key", "OPENAI_API_KEY")
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "https://todo-app.openai.azure.com/")
     deploy   = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4-mini")
     if not api_key:
-        raise HTTPException(status_code=500, detail=f"OPENAI_API_KEY not set. Looked for .env at: {_env_path}")
+        raise HTTPException(status_code=500, detail=f"OpenAI API key not found in Key Vault or env. Looked for .env at: {_env_path}")
     try:
         from langchain_openai import AzureChatOpenAI
         llm    = AzureChatOpenAI(
