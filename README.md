@@ -16,7 +16,7 @@ A full-stack todo app where you describe tasks in plain English and AI automatic
 ## Architecture
 
 ```
-![architecture](images.png)
+![architecture](image.png)
 
 Frontend (React)
     │  HTTP (tasks, auth)
