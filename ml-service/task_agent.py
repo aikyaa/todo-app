@@ -78,7 +78,7 @@ _PROMPT = ChatPromptTemplate.from_messages([
 ])
 
 
-def _get_llm():
+def _build_llm():
     api_key  = os.getenv("OPENAI_API_KEY")
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "https://todo-app.openai.azure.com/")
     deploy   = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4-mini")
@@ -90,12 +90,14 @@ def _get_llm():
         azure_deployment=deploy,
         api_version="2024-08-01-preview",
         temperature=0,
-    )
+    ).with_structured_output(TaskAnalysis)
+
+# Initialize once at module load — reused for every task
+_llm = _build_llm()
 
 
 def analyze_task(raw_input: str) -> dict:
-    llm    = _get_llm().with_structured_output(TaskAnalysis)
-    result = (_PROMPT | llm).invoke({
+    result = (_PROMPT | _llm).invoke({
         "raw_input": raw_input,
         "today":     date.today().isoformat(),
     })

@@ -30,8 +30,7 @@ API.interceptors.response.use(
     }
 );
 
-export const createTask  = (rawInput)  => API.post('/tasks', { rawInput });
-export const getAllTasks  = (status)    => API.get('/tasks', { params: status ? { status } : {} });
-export const getTask     = (id)        => API.get(`/tasks/${id}`);
-export const updateTask  = (id, data)  => API.put(`/tasks/${id}`, data);
-export const deleteTask  = (id)        => API.delete(`/tasks/${id}`);
+export const createTask = (rawInput)  => API.post('/tasks', { rawInput });
+export const getAllTasks = (status)   => API.get('/tasks', { params: status ? { status } : {} });
+export const updateTask = (id, data) => API.put(`/tasks/${id}`, data);
+export const deleteTask = (id)       => API.delete(`/tasks/${id}`);

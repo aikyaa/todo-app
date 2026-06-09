@@ -26,21 +26,24 @@ app = FastAPI()
 
 # ── Queue worker ───────────────────────────────────────────────────────────────
 
+# Read once at startup — these don't change at runtime
+_JAVA_URL      = os.getenv("JAVA_BACKEND_URL", "http://localhost:8080")
+_ENRICH_SECRET = os.getenv("ENRICH_SECRET", "local-enrich-secret")
+
+
 def _process_message(message_body: str):
-    payload       = json.loads(message_body)
-    task_id       = payload["taskId"]
-    raw_input     = payload["rawInput"]
-    java_url      = os.getenv("JAVA_BACKEND_URL", "http://localhost:8080")
-    enrich_secret = os.getenv("ENRICH_SECRET", "local-enrich-secret")
+    payload   = json.loads(message_body)
+    task_id   = payload["taskId"]
+    raw_input = payload["rawInput"]
 
     logger.info("Processing task %s", task_id)
 
     result = analyze_task(raw_input)
 
     response = requests.put(
-        f"{java_url}/api/tasks/{task_id}/enrich",
+        f"{_JAVA_URL}/api/tasks/{task_id}/enrich",
         json=result,
-        headers={"X-Enrich-Secret": enrich_secret},
+        headers={"X-Enrich-Secret": _ENRICH_SECRET},
         timeout=10,
     )
     response.raise_for_status()

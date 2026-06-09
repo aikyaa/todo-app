@@ -146,15 +146,8 @@ export default function App() {
       localStorage.setItem('token', res.data.token);
       setToken(res.data.token);
     } catch (e) {
-      const status = e.response?.status;
       const msg = e.response?.data?.error;
-      if (status === 401 || status === 403) {
-        setAuthError('Invalid email or password');
-      } else if (msg) {
-        setAuthError(msg);
-      } else {
-        setAuthError('Something went wrong');
-      }
+      setAuthError(msg || 'Something went wrong');
     }
   };
 

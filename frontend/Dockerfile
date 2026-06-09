@@ -1,12 +1,12 @@
 # Stage 1 — build React app
 FROM node:20-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-# REACT_APP_API_URL is baked in at build time
+# Declare build arg before COPY so it's available during npm run build
 ARG REACT_APP_API_URL
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
 RUN npm run build
 
 # Stage 2 — serve with nginx
