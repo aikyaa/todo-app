@@ -16,7 +16,7 @@ A full-stack todo app where you describe tasks in plain English and AI automatic
 ## Architecture
 
 ```
-
+![architecture](images.png)
 
 Frontend (React)
     │  HTTP (tasks, auth)
@@ -69,7 +69,7 @@ CREATE DATABASE tododb;
 
 ### 2. Backend
 
-Create `backend/run.ps1` (already gitignored):
+Create `backend/run.ps1` :
 
 ```powershell
 $env:AZURE_SERVICEBUS_CONNECTION_STRING="<your-connection-string>"
@@ -80,14 +80,14 @@ mvn spring-boot:run
 
 ```powershell
 cd backend
-./run.ps1
+mvn spring-boot:run
 ```
 
 Runs on `http://localhost:8080`.
 
 ### 3. ML Service
 
-Create `ml-service/.env` (already gitignored):
+Create `ml-service/.env` :
 
 ```
 OPENAI_API_KEY=<your-azure-openai-key>
@@ -154,7 +154,7 @@ Runs on `http://localhost:3000`.
 
 ## Live demo
 
-🌐 **App** — [https://todo-frontend.YOUR-DOMAIN.azurecontainerapps.io](https://todo-frontend.YOUR-DOMAIN.azurecontainerapps.io)
+🌐 **App** — ([https://todo-frontend.YOUR-DOMAIN.azurecontainerapps.io](https://todo-frontend.icyrock-e26108ae.eastus.azurecontainerapps.io/))
 
 🎥 **Demo video** — [Google Drive](https://drive.google.com/your-link-here)
 
