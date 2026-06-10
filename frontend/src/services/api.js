@@ -31,6 +31,6 @@ API.interceptors.response.use(
 );
 
 export const createTask = (rawInput)  => API.post('/tasks', { rawInput });
-export const getAllTasks = (status)   => API.get('/tasks', { params: status ? { status } : {} });
+export const getAllTasks = ()          => API.get('/tasks');
 export const updateTask = (id, data) => API.put(`/tasks/${id}`, data);
 export const deleteTask = (id)       => API.delete(`/tasks/${id}`);

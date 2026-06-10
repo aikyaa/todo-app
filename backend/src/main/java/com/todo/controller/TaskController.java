@@ -8,7 +8,7 @@ import com.todo.model.User;
 import com.todo.service.TaskService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,9 +23,8 @@ public class TaskController {
 
     private final TaskService taskService;
 
-    // Shared secret Python must send in X-Enrich-Secret header
-    @Value("${app.enrich-secret}")
-    private String enrichSecret;
+    // Fetched from Key Vault at startup via AppSecretsConfig
+    private final @Qualifier("enrichSecret") String enrichSecret;
 
     @PostMapping
     public ResponseEntity<TaskResponse> create(@Valid @RequestBody TaskRequest req,

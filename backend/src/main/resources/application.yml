@@ -2,19 +2,16 @@ server:
   port: 8080
 
 spring:
-  cloud:
-    azure:
-      keyvault:
-        secret:
-          # When AZURE_KEYVAULT_URL is set, secrets are loaded from Key Vault as Spring properties.
-          # Locally: set this + run `az login`. In production: managed identity handles auth automatically.
-          # Leave unset to skip Key Vault (falls back to env vars / defaults below).
-          endpoint: ${AZURE_KEYVAULT_URL:}
+  config:
+    # URL is resolved from AZURE_KEYVAULT_URL env var at import time.
+    # "optional:" means: if KV is unreachable or env var is unset, skip gracefully.
+    # In prod: AZURE_KEYVAULT_URL=https://todo-app-kv.vault.azure.net/
+    # Locally: unset AZURE_KEYVAULT_URL to skip KV and use env var fallbacks below.
+    import: "optional:azure-keyvault:${AZURE_KEYVAULT_URL:}"
   datasource:
     url:               ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/tododb}
     username:          ${DB_USERNAME:postgres}
-    # Tries Key Vault secret "db-password" first, then falls back to DB_PASSWORD env var
-    password:          ${db-password:${DB_PASSWORD:postgres}}
+    # Password is fetched from Key Vault in DataSourceConfig at startup
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -26,14 +23,14 @@ app:
   jwt:
     # Tries Key Vault secret "jwt-secret" first (when AZURE_KEYVAULT_URL is set),
     # then falls back to JWT_SECRET env var, then to the insecure default.
-    secret: ${jwt-secret:${JWT_SECRET:todoai-default-secret-key-change-in-production-must-be-long}}
+    secret: ${jwt.secret:${JWT_SECRET:todoai-default-secret-key-change-in-production-must-be-long}}
     expiration-ms: 10800000
-  enrich-secret: ${ENRICH_SECRET:local-enrich-secret}
+  enrich-secret: ${enrich.secret:${ENRICH_SECRET:local-enrich-secret}}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 azure:
   servicebus:
     # Tries Key Vault secret "servicebus-connection-string" first, then falls back to env var
-    connection-string: ${servicebus-connection-string:${AZURE_SERVICEBUS_CONNECTION_STRING:}}
+    connection-string: ${servicebus.connection.string:${AZURE_SERVICEBUS_CONNECTION_STRING:}}
     queue-name: ${AZURE_SERVICEBUS_QUEUE_NAME:task-queue}

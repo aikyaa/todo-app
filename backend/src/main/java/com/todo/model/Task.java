@@ -68,6 +68,6 @@ public class Task {
         updatedAt = LocalDateTime.now();
     }
 
-    public enum Status   { PENDING, IN_PROGRESS, COMPLETED }
+    public enum Status   { PENDING, IN_PROGRESS, COMPLETED, FAILED }
     public enum Priority { LOW, MEDIUM, HIGH, URGENT }
 }

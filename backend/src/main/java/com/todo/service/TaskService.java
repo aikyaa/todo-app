@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
@@ -21,6 +23,17 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class TaskService {
+
+    // URGENT first, then HIGH, MEDIUM, LOW; null/unset sorts last
+    private static final Map<Task.Priority, Integer> PRIORITY_ORDER = Map.of(
+            Task.Priority.URGENT, 1,
+            Task.Priority.HIGH,   2,
+            Task.Priority.MEDIUM, 3,
+            Task.Priority.LOW,    4
+    );
+
+    private static final Comparator<Task> BY_PRIORITY =
+            Comparator.comparingInt(t -> PRIORITY_ORDER.getOrDefault(t.getPriority(), 5));
 
     private final TaskRepository taskRepository;
     private final TaskQueueService queueService;
@@ -47,13 +60,19 @@ public class TaskService {
 
     public List<TaskResponse> getAll(String userId) {
         return taskRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream().map(TaskResponse::from).collect(Collectors.toList());
+                .stream()
+                .sorted(BY_PRIORITY)
+                .map(TaskResponse::from)
+                .collect(Collectors.toList());
     }
 
     public List<TaskResponse> getByStatus(String status, String userId) {
         Task.Status s = Task.Status.valueOf(status.toUpperCase());
         return taskRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, s)
-                .stream().map(TaskResponse::from).collect(Collectors.toList());
+                .stream()
+                .sorted(BY_PRIORITY)
+                .map(TaskResponse::from)
+                .collect(Collectors.toList());
     }
 
     public TaskResponse getOne(String id, String userId) {

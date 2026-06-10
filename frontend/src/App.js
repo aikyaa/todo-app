@@ -3,15 +3,16 @@ import { createTask, getAllTasks, updateTask, deleteTask, login, register } from
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
-const STATUSES = ['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED'];
+const STATUSES   = ['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED'];
+const PRIORITIES = ['ALL', 'URGENT', 'HIGH', 'MEDIUM', 'LOW'];
 
-// Inject global CSS for hover/focus pseudo-classes and transitions
+// Priority sort order — URGENT first
+const PRIORITY_ORDER = { URGENT: 1, HIGH: 2, MEDIUM: 3, LOW: 4 };
+
 const GLOBAL_CSS = `
   * { box-sizing: border-box; }
-
   body { margin: 0; }
 
-  /* Task cards lift subtly on hover */
   .task-card {
     transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   }
@@ -21,102 +22,72 @@ const GLOBAL_CSS = `
     box-shadow: 0 4px 16px rgba(0,0,0,0.25);
   }
 
-  /* Buttons fade smoothly */
-  .btn {
-    transition: opacity 0.15s ease, transform 0.12s ease, background 0.15s ease;
-  }
+  .btn { transition: opacity 0.15s ease, transform 0.12s ease, background 0.15s ease; }
   .btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
   .btn:active:not(:disabled) { transform: translateY(0); opacity: 1; }
 
-  /* Filter tabs transition colours */
   .filter-tab {
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
   .filter-tab:hover { border-color: #a78bfa60 !important; color: #a78bfa !important; }
 
-  /* Input focus glow */
   .field:focus {
     border-color: #a78bfa !important;
     box-shadow: 0 0 0 3px rgba(167,139,250,0.12);
     outline: none;
   }
 
-  /* Sign out button */
-  .signout-btn {
-    transition: background 0.15s ease, color 0.15s ease;
-  }
+  .signout-btn { transition: background 0.15s ease, color 0.15s ease; }
   .signout-btn:hover { background: #2e3140 !important; color: #e2e4f0 !important; }
 
-  /* Auth input focus */
   .auth-input:focus {
     border-color: #a78bfa !important;
     box-shadow: 0 0 0 3px rgba(167,139,250,0.1);
     outline: none;
   }
 
-  /* Auth submit button */
-  .auth-btn {
-    transition: opacity 0.15s ease, transform 0.12s ease;
-  }
-  .auth-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+  .auth-btn { transition: opacity 0.15s ease, transform 0.12s ease; }
+  .auth-btn:hover  { opacity: 0.88; transform: translateY(-1px); }
   .auth-btn:active { transform: translateY(0); }
 
-  /* Priority accent bar glow on card hover */
   .task-card:hover .priority-bar { opacity: 1 !important; }
 
-  /* Badge subtle pop */
-  .badge {
-    transition: transform 0.15s ease;
-  }
+  .badge { transition: transform 0.15s ease; }
   .task-card:hover .badge { transform: scale(1.04); }
 
-  /* Edit/delete action buttons */
-  .action-btn {
-    transition: opacity 0.15s ease, transform 0.12s ease;
-  }
+  .action-btn { transition: opacity 0.15s ease, transform 0.12s ease; }
   .action-btn:hover { opacity: 0.8; transform: translateY(-1px); }
 
-  /* Select focus */
   select.field:focus { outline: none; }
 
-  /* Add button pulse when loading */
   @keyframes pulse {
     0%, 100% { opacity: 0.6; }
-    50%       { opacity: 1; }
+    50%       { opacity: 1;   }
   }
   .btn-loading { animation: pulse 1.2s ease-in-out infinite; }
 `;
 
-function GlobalStyles() {
-  return <style>{GLOBAL_CSS}</style>;
-}
+function GlobalStyles() { return <style>{GLOBAL_CSS}</style>; }
 
 // ── Soft dark palette ─────────────────────────────────────────────────────────
 const C = {
-  // backgrounds
-  bg:          '#1c1e26',   // page background
-  surface:     '#252731',   // card / panel background
-  surfaceHigh: '#2e3140',   // elevated surface (inputs, selects)
-  border:      '#383b4d',   // subtle borders
-
-  // accents — purple / teal pastels
-  purple:      '#a78bfa',   // primary accent
-  purpleDim:   '#2d2640',   // muted purple background
-  teal:        '#5eead4',   // secondary accent
-  tealDim:     '#1a2e2e',   // muted teal background
-  rose:        '#fb7185',   // destructive / urgent
+  bg:          '#1c1e26',
+  surface:     '#252731',
+  surfaceHigh: '#2e3140',
+  border:      '#383b4d',
+  purple:      '#a78bfa',
+  purpleDim:   '#2d2640',
+  teal:        '#5eead4',
+  tealDim:     '#1a2e2e',
+  rose:        '#fb7185',
   roseDim:     '#2e1a20',
-  amber:       '#fbbf24',   // high priority
+  amber:       '#fbbf24',
   amberDim:    '#2e2410',
-  green:       '#4ade80',   // success / completed
+  green:       '#4ade80',
   greenDim:    '#1a2e1a',
-
-  // text
-  text:        '#e2e4f0',   // primary text
-  textMuted:   '#7c7f96',   // secondary text
-  textDim:     '#4b4e63',   // very muted
-
-  white:       '#ffffff',
+  text:        '#e2e4f0',
+  textMuted:   '#7c7f96',
+  textDim:     '#4b4e63',
 };
 
 export default function App() {
@@ -125,73 +96,116 @@ export default function App() {
   const [authForm,  setAuthForm]  = useState({ name: '', email: '', password: '' });
   const [authError, setAuthError] = useState('');
 
-  const [tasks,   setTasks]   = useState([]);
-  const [filter,  setFilter]  = useState('ALL');
-  const [input,   setInput]   = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
+  const [tasks,          setTasks]          = useState([]);
+  const [statusFilter,   setStatusFilter]   = useState('ALL');
+  const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [input,          setInput]          = useState('');
+  const [loading,        setLoading]        = useState(false);
+  const [error,          setError]          = useState('');
 
   const [editId,   setEditId]   = useState(null);
   const [editData, setEditData] = useState({});
 
   const stompRef = useRef(null);
 
+  // ── Auth ──────────────────────────────────────────────────────────────────
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthError('');
+
+    // Client-side validation — fast feedback before hitting the API
+    if (authMode === 'register') {
+      if (!authForm.name.trim())
+        return setAuthError('Name is required');
+      if (!authForm.email.trim())
+        return setAuthError('Email is required');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authForm.email))
+        return setAuthError('Please enter a valid email address');
+      if (authForm.password.length < 6)
+        return setAuthError('Password must be at least 6 characters');
+    } else {
+      if (!authForm.email.trim())
+        return setAuthError('Email is required');
+      if (!authForm.password)
+        return setAuthError('Password is required');
+    }
+
     try {
       const res = authMode === 'login'
         ? await login(authForm.email, authForm.password)
         : await register(authForm.name, authForm.email, authForm.password);
       localStorage.setItem('token', res.data.token);
       setToken(res.data.token);
-    } catch (e) {
-      const msg = e.response?.data?.error;
-      setAuthError(msg || 'Something went wrong');
+    } catch (err) {
+      const msg = err.response?.data?.error;
+      setAuthError(msg || 'Something went wrong. Please try again.');
     }
   };
 
   const handleLogout = () => {
+    // Explicitly close the WebSocket before clearing state
+    stompRef.current?.deactivate();
+    stompRef.current = null;
     localStorage.removeItem('token');
     setToken(null);
     setTasks([]);
+    setStatusFilter('ALL');
+    setPriorityFilter('ALL');
   };
 
-  // ── Task hooks — must be before any conditional return ───────────────────
+  // ── Data loading ──────────────────────────────────────────────────────────
+  // Fetch all tasks from server; client-side filtering handles status+priority.
   const load = useCallback(async () => {
     try {
-      const res = await getAllTasks(filter === 'ALL' ? null : filter);
+      const res = await getAllTasks();
       setTasks(res.data);
     } catch (e) { console.error(e); }
-  }, [filter]);
+  }, []);
 
   useEffect(() => { if (token) load(); }, [load, token]);
 
-  // WebSocket — connects once when logged in, receives enriched tasks pushed by backend
+  // ── WebSocket ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!token) return;
 
     const client = new Client({
-      webSocketFactory: () => new SockJS((process.env.REACT_APP_API_URL || 'http://localhost:8080') + '/ws'),
+      webSocketFactory: () =>
+        new SockJS((process.env.REACT_APP_API_URL || 'http://localhost:8080') + '/ws'),
       connectHeaders: { Authorization: `Bearer ${token}` },
       onConnect: () => {
         client.subscribe('/user/queue/tasks', message => {
-          const enrichedTask = JSON.parse(message.body);
-          setTasks(prev => prev.map(t => t.id === enrichedTask.id ? enrichedTask : t));
+          const updated = JSON.parse(message.body);
+          setTasks(prev => {
+            const exists = prev.some(t => t.id === updated.id);
+            return exists
+              ? prev.map(t => t.id === updated.id ? updated : t)
+              : [updated, ...prev];
+          });
         });
-        // fetch latest tasks in case any were enriched during connection setup
         load();
       },
       onDisconnect: () => console.log('WebSocket disconnected'),
-      onStompError: frame => console.error('STOMP error', frame),
+      onStompError:  frame => console.error('STOMP error', frame),
     });
 
     client.activate();
     stompRef.current = client;
 
-    return () => client.deactivate();
+    return () => {
+      client.deactivate();
+      stompRef.current = null;
+    };
   }, [token]);
 
+  // ── Derived: filtered + priority-sorted task list ─────────────────────────
+  const displayedTasks = tasks
+    .filter(t => statusFilter   === 'ALL' || t.status   === statusFilter)
+    .filter(t => priorityFilter === 'ALL' || t.priority === priorityFilter)
+    .sort((a, b) =>
+      (PRIORITY_ORDER[a.priority] || 5) - (PRIORITY_ORDER[b.priority] || 5)
+    );
+
+  // ── Task actions ──────────────────────────────────────────────────────────
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -245,7 +259,10 @@ export default function App() {
     } catch (e) { console.error(e); }
   };
 
-  const statusLabel = s => ({ PENDING: 'Pending', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', ALL: 'All' }[s] || s);
+  const statusLabel = s => ({
+    PENDING: 'Pending', IN_PROGRESS: 'In Progress',
+    COMPLETED: 'Done', FAILED: 'Failed', ALL: 'All',
+  }[s] || s);
 
   // ── Auth screen ───────────────────────────────────────────────────────────
   if (!token) {
@@ -331,7 +348,7 @@ export default function App() {
         }}>Sign Out</button>
       </div>
 
-      <div style={{ maxWidth: 660, margin: '0 auto', padding: '24px 16px' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px' }}>
 
         {/* Create input */}
         <div style={{
@@ -343,7 +360,7 @@ export default function App() {
               className="field"
               value={input}
               onChange={e => setInput(e.target.value)}
-              placeholder='Describe a task — AI will handle the rest...'
+              placeholder="Describe a task — AI will handle the rest..."
               style={{
                 flex: 1, padding: '10px 14px', fontSize: 14,
                 background: C.surfaceHigh, border: `1px solid ${C.border}`,
@@ -364,43 +381,103 @@ export default function App() {
           {error && <p style={{ color: C.rose, fontSize: 12, margin: '8px 0 0' }}>{error}</p>}
         </div>
 
-        {/* Filter tabs */}
-        <div style={{ display: 'flex', gap: 5, marginBottom: 16 }}>
-          {STATUSES.map(s => (
-            <button key={s} className="filter-tab" onClick={() => setFilter(s)} style={{
-              padding: '5px 13px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-              border: `1px solid ${filter === s ? C.purple + '60' : C.border}`,
-              background: filter === s ? C.purpleDim : 'transparent',
-              color: filter === s ? C.purple : C.textMuted,
-              cursor: 'pointer',
-            }}>
-              {statusLabel(s)}
-            </button>
-          ))}
-          {tasks.length > 0 && (
-            <span style={{ marginLeft: 'auto', color: C.textDim, fontSize: 12, alignSelf: 'center' }}>
-              {tasks.length} task{tasks.length !== 1 ? 's' : ''}
+        {/* Filters */}
+        <div style={{
+          background: C.surface, borderRadius: 10, padding: '12px 14px',
+          border: `1px solid ${C.border}`, marginBottom: 16,
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          {/* Status filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: C.textDim, fontWeight: 600,
+              textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 52 }}>
+              Status
             </span>
-          )}
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {STATUSES.map(s => (
+                <button key={s} className="filter-tab" onClick={() => setStatusFilter(s)} style={{
+                  padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 500,
+                  border: `1px solid ${statusFilter === s ? statusColor(s) + '60' : C.border}`,
+                  background: statusFilter === s ? statusDim(s) : 'transparent',
+                  color: statusFilter === s ? statusColor(s) : C.textMuted,
+                  cursor: 'pointer',
+                }}>
+                  {statusLabel(s)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Priority filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: C.textDim, fontWeight: 600,
+              textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 52 }}>
+              Priority
+            </span>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {PRIORITIES.map(p => (
+                <button key={p} className="filter-tab" onClick={() => setPriorityFilter(p)} style={{
+                  padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 500,
+                  border: `1px solid ${priorityFilter === p
+                    ? (p === 'ALL' ? C.purple + '60' : priorityColor(p) + '60')
+                    : C.border}`,
+                  background: priorityFilter === p
+                    ? (p === 'ALL' ? C.purpleDim : priorityDim(p))
+                    : 'transparent',
+                  color: priorityFilter === p
+                    ? (p === 'ALL' ? C.purple : priorityColor(p))
+                    : C.textMuted,
+                  cursor: 'pointer',
+                }}>
+                  {p === 'ALL' ? 'All' : p.charAt(0) + p.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+            {(statusFilter !== 'ALL' || priorityFilter !== 'ALL') && (
+              <button onClick={() => { setStatusFilter('ALL'); setPriorityFilter('ALL'); }} style={{
+                marginLeft: 'auto', padding: '3px 9px', borderRadius: 6, fontSize: 11,
+                background: 'transparent', color: C.textDim,
+                border: `1px solid ${C.border}`, cursor: 'pointer',
+              }}>
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Task count */}
+        {tasks.length > 0 && (
+          <div style={{ color: C.textDim, fontSize: 12, marginBottom: 10, paddingLeft: 2 }}>
+            {displayedTasks.length === tasks.length
+              ? `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`
+              : `${displayedTasks.length} of ${tasks.length} tasks`}
+            {' · sorted by priority'}
+          </div>
+        )}
+
         {/* Empty state */}
-        {tasks.length === 0 && (
+        {displayedTasks.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: C.textDim }}>
             <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.5 }}>✦</div>
-            <p style={{ margin: 0, fontSize: 14 }}>No tasks yet.</p>
+            <p style={{ margin: 0, fontSize: 14 }}>
+              {tasks.length === 0 ? 'No tasks yet.' : 'No tasks match the current filters.'}
+            </p>
           </div>
         )}
 
         {/* Task list */}
-        {tasks.map(task => (
+        {displayedTasks.map(task => (
           <div key={task.id} className="task-card" style={{
             background: C.surface, borderRadius: 10, marginBottom: 8,
-            border: `1px solid ${C.border}`, overflow: 'hidden',
+            border: `1px solid ${task.status === 'FAILED' ? C.rose + '30' : C.border}`,
+            overflow: 'hidden',
           }}>
-            {/* Priority accent */}
+            {/* Priority accent bar */}
             {task.enriched && task.priority && (
-              <div className="priority-bar" style={{ height: 2, background: priorityColor(task.priority), opacity: 0.8, transition: 'opacity 0.18s ease' }} />
+              <div className="priority-bar" style={{
+                height: 2, background: priorityColor(task.priority), opacity: 0.8,
+                transition: 'opacity 0.18s ease',
+              }} />
             )}
 
             <div style={{ padding: '13px 15px' }}>
@@ -444,13 +521,21 @@ export default function App() {
                 // ── View mode ────────────────────────────────────────────
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 14, color: C.text, lineHeight: 1.45 }}>
+                    <span style={{
+                      fontWeight: 600, fontSize: 14, color: C.text, lineHeight: 1.45,
+                      textDecoration: task.status === 'COMPLETED' ? 'line-through' : 'none',
+                      opacity: task.status === 'COMPLETED' ? 0.6 : 1,
+                    }}>
                       {task.title}
                     </span>
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
-                      {!task.enriched && <Badge label="processing" color={C.surfaceHigh} textColor={C.textMuted} />}
-                      {task.enriched && task.priority && (
-                        <Badge label={task.priority} color={priorityDim(task.priority)} textColor={priorityColor(task.priority)} className="badge" />
+                      {!task.enriched && task.status !== 'FAILED' &&
+                        <Badge label="processing" color={C.surfaceHigh} textColor={C.textMuted} />}
+                      {task.status === 'FAILED' &&
+                        <Badge label="failed" color={C.roseDim} textColor={C.rose} className="badge" />}
+                      {task.enriched && task.priority && task.status !== 'FAILED' && (
+                        <Badge label={task.priority} color={priorityDim(task.priority)}
+                          textColor={priorityColor(task.priority)} className="badge" />
                       )}
                       {task.enriched && task.category && (
                         <Badge label={task.category} color={C.tealDim} textColor={C.teal} className="badge" />
@@ -471,20 +556,34 @@ export default function App() {
                   )}
 
                   <div style={{ display: 'flex', alignItems: 'center', marginTop: 10, gap: 6 }}>
-                    <select aria-label="Task status" value={task.status} onChange={e => handleStatusChange(task.id, e.target.value)}
-                      style={{
-                        ...selectSt, fontSize: 11, padding: '3px 8px',
-                        color: statusColor(task.status), borderColor: statusColor(task.status) + '40',
-                        background: statusDim(task.status),
+                    {task.status !== 'FAILED' ? (
+                      <select aria-label="Task status" value={task.status}
+                        onChange={e => handleStatusChange(task.id, e.target.value)}
+                        style={{
+                          ...selectSt, fontSize: 11, padding: '3px 8px',
+                          color: statusColor(task.status),
+                          borderColor: statusColor(task.status) + '40',
+                          background: statusDim(task.status),
+                        }}>
+                        {['PENDING', 'IN_PROGRESS', 'COMPLETED'].map(s =>
+                          <option key={s} value={s}>{statusLabel(s)}</option>)}
+                      </select>
+                    ) : (
+                      <span style={{
+                        fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                        color: C.rose, background: C.roseDim,
+                        border: `1px solid ${C.rose}30`,
                       }}>
-                      {['PENDING', 'IN_PROGRESS', 'COMPLETED'].map(s =>
-                        <option key={s} value={s}>{statusLabel(s)}</option>)}
-                    </select>
+                        Processing failed
+                      </span>
+                    )}
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: 5 }}>
-                      <button className="action-btn" onClick={() => startEdit(task)} style={{
-                        padding: '3px 10px', background: C.purpleDim, color: C.purple,
-                        border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                      }}>Edit</button>
+                      {task.status !== 'FAILED' && (
+                        <button className="action-btn" onClick={() => startEdit(task)} style={{
+                          padding: '3px 10px', background: C.purpleDim, color: C.purple,
+                          border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                        }}>Edit</button>
+                      )}
                       <button className="action-btn" onClick={() => handleDelete(task.id)} style={{
                         padding: '3px 10px', background: C.roseDim, color: C.rose,
                         border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 500,
@@ -538,8 +637,18 @@ function priorityDim(p) {
   return { LOW: '#2a2c38', MEDIUM: '#2d2640', HIGH: '#2e2410', URGENT: '#2e1a20' }[p] || '#2a2c38';
 }
 function statusColor(s) {
-  return { PENDING: '#7c7f96', IN_PROGRESS: '#a78bfa', COMPLETED: '#4ade80' }[s] || '#7c7f96';
+  return {
+    PENDING:     '#7c7f96',
+    IN_PROGRESS: '#fbbf24',
+    COMPLETED:   '#4ade80',
+    FAILED:      '#fb7185',
+  }[s] || '#7c7f96';
 }
 function statusDim(s) {
-  return { PENDING: '#2a2c38', IN_PROGRESS: '#2d2640', COMPLETED: '#1a2e1a' }[s] || '#2a2c38';
+  return {
+    PENDING:     '#2a2c38',
+    IN_PROGRESS: '#2e2410',
+    COMPLETED:   '#1a2e1a',
+    FAILED:      '#2e1a20',
+  }[s] || '#2a2c38';
 }
