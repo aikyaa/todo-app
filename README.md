@@ -156,18 +156,18 @@ todo-app/
 │   │   ├── model/            # Task, User entities
 │   │   ├── dto/              # Request/response DTOs
 │   │   ├── repository/       # TaskRepository, UserRepository
-│   │   ├── queue/            # TaskQueueService (sends to Service Bus)
+│   │   ├── queue/            # TaskQueueService
 │   │   └── exception/        # GlobalExceptionHandler
 │   └── src/main/resources/
 │       └── application.yml
 ├── ml-service/               # Python FastAPI + LangChain
 │   ├── main.py               # FastAPI app, queue worker thread
 │   └── task_agent.py         # LLM prompt, TaskAnalysis schema
-├── frontend/                 # React app
-│   └── src/
-│       ├── App.js            # Main component, WebSocket setup
-│       └── services/api.js   # Axios clients
-└── DEPLOY.md                 # Azure deployment guide
+└── frontend/                 # React app
+    └── src/
+        ├── App.js            # Main component, WebSocket setup
+        └── services/api.js   # Axios clients
+
 ```
 
 ---
@@ -195,9 +195,6 @@ If processing fails → message abandoned → retried up to 10 times → dead-le
 ---
 
 ## Edge case handling
-
-### Duplicate queue messages — `inQueue` flag
-When a task is created, `inQueue` is set to `true` before the message is sent to Service Bus. It's cleared to `false` when enrichment completes or the task is marked FAILED. The retry scheduler only picks up tasks where `inQueue = false`, so a task that's already sitting in the queue won't get a second message sent for it.
 
 ### Stuck tasks — retry scheduler
 If the ML service is down (or a message is silently lost), a task can sit in PENDING indefinitely. `TaskRetryScheduler` runs every 2 minutes and finds tasks that are `enriched = false`, `inQueue = false`, `status = PENDING`, and haven't been updated in 5+ minutes. It sets `inQueue = true`, resets `updatedAt` (which becomes the new retry clock), and re-sends the message to the queue.
