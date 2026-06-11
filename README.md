@@ -137,9 +137,9 @@ Runs on `http://localhost:3000`.
 
 ## Demo
 
-🌐 **App** — ([https://todo-frontend.icyrock-e26108ae.eastus.azurecontainerapps.io/](https://todo-frontend.icyrock-e26108ae.eastus.azurecontainerapps.io/))
+🌐 **App** — https://polite-plant-08ce7cd0f.7.azurestaticapps.net
 
-🎥 **Demo video** — [Google Drive](https://drive.google.com/your-link-here)
+🎥 **Demo video** — 
 
 ---
 
