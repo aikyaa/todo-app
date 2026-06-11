@@ -15,7 +15,6 @@ A full-stack todo app where you describe tasks in plain English and AI automatic
 
 ## Architecture
 
-```
 ![Block diagram](block-diagram.png)
 
 ---
@@ -29,8 +28,8 @@ A full-stack todo app where you describe tasks in plain English and AI automatic
 | Auth | JWT (JJWT), BCrypt |
 | ML Service | Python, FastAPI, LangChain, Azure OpenAI |
 | Queue | Azure Service Bus |
-| Database | PostgreSQL |
-| Deployment | Azure Container Apps, Azure Container Registry |
+| Database | PostgreSQL (Azure Flexible Server) |
+| Deployment | Azure Static Web Apps (frontend), Azure Container Apps (backend + ML), Azure Container Registry |
 
 ---
 
@@ -108,12 +107,13 @@ Runs on `http://localhost:3000`.
 |---|---|---|
 | `SPRING_DATASOURCE_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/tododb` |
 | `DB_USERNAME` | Database username | `postgres` |
-| `DB_PASSWORD` | Database password | `postgres` |
+| `DB_PASSWORD` | DB password — local dev only; in Azure the password is fetched from Key Vault (`pg-password`) | `postgres` |
 | `JWT_SECRET` | Secret key for signing JWTs (min 32 chars) | dev default |
-| `AZURE_SERVICEBUS_CONNECTION_STRING` | Service Bus connection string | — |
+| `AZURE_SERVICEBUS_CONNECTION_STRING` | Service Bus connection string — local dev only; in Azure fetched from Key Vault (`servicebus-connection-string`) | — |
 | `AZURE_SERVICEBUS_QUEUE_NAME` | Queue name | `task-queue` |
-| `ENRICH_SECRET` | Shared secret for ML service callback | `local-enrich-secret` |
+| `ENRICH_SECRET` | Shared secret for ML service callback — local dev only; in Azure fetched from Key Vault (`enrich-secret`) | `local-enrich-secret` |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins | `http://localhost:3000` |
+| `AZURE_KEYVAULT_URL` | Key Vault URL — when set, secrets are fetched from KV instead of env vars | — |
 
 ### ML Service
 
@@ -131,7 +131,7 @@ Runs on `http://localhost:3000`.
 
 | Variable | Description | Default |
 |---|---|---|
-| `REACT_APP_API_URL` | Backend base URL | `http://localhost:8080` |
+| `REACT_APP_API_URL` | Backend base URL — baked into the React bundle at build time; for Azure deployments set this as a GitHub Actions secret (`REACT_APP_API_URL`) so it's injected during the Static Web Apps build | `http://localhost:8080` |
 
 ---
 
@@ -166,6 +166,7 @@ todo-app/
 │   ├── main.py               # FastAPI app, queue worker thread
 │   └── task_agent.py         # LLM prompt, TaskAnalysis schema
 └── frontend/                 # React app
+    ├── staticwebapp.config.json  # Azure Static Web Apps routing + security headers
     └── src/
         ├── App.js            # Main component, WebSocket setup
         └── services/api.js   # Axios clients
@@ -220,4 +221,3 @@ The STOMP client's `beforeConnect` callback decodes the JWT expiry from the toke
 
 ### WebSocket vs SSE
 This app uses WebSocket (STOMP over SockJS) for server-to-client task updates. In practice, all real-time communication flows in one direction only — the server pushes enriched task data to the browser; the browser never sends data over the socket. **Server-Sent Events (SSE)** would be a simpler and more appropriate fit for this pattern: SSE is a native browser API, requires no extra protocol layer, handles reconnection automatically, and works over plain HTTP/2 without the overhead of a WebSocket upgrade. The main trade-off is that SSE is strictly unidirectional, but since the frontend already uses REST for all writes, that's not a constraint here.
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
