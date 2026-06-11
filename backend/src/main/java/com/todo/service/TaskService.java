@@ -48,8 +48,33 @@ public class TaskService {
                 .userId(userId)
                 .build();
         task = taskRepository.save(task);
-        queueService.enqueue(new QueuedTaskPayload(task.getId(), rawInput));
+        try {
+            task.setInQueue(true);
+            taskRepository.save(task);
+            queueService.enqueue(new QueuedTaskPayload(task.getId(), rawInput));
+        } catch (Exception e) {
+            // Queue unavailable (full, Service Bus down, etc.) — save task as FAILED
+            // so the user gets immediate feedback rather than a stuck "processing" card
+            log.error("Failed to enqueue task {} — marking FAILED: {}", task.getId(), e.getMessage());
+            task.setInQueue(false);
+            task.setStatus(Task.Status.FAILED);
+            taskRepository.save(task);
+        }
         return TaskResponse.from(task);
+    }
+
+    // Called by DeadLetterProcessor — lives here so @Transactional goes through the proxy
+    @Transactional
+    public void markFailed(String taskId) {
+        taskRepository.findById(taskId).ifPresentOrElse(task -> {
+            task.setStatus(Task.Status.FAILED);
+            task.setInQueue(false);
+            taskRepository.save(task);
+            log.info("Task {} marked FAILED", taskId);
+            userRepository.findById(task.getUserId()).ifPresent(user ->
+                messagingTemplate.convertAndSendToUser(
+                        user.getEmail(), "/queue/tasks", TaskResponse.from(task)));
+        }, () -> log.warn("markFailed: task {} not found in DB", taskId));
     }
 
     // Extract first sentence or first 60 chars as a quick title — no LLM needed
@@ -133,7 +158,10 @@ public class TaskService {
             }
         }
 
-        if (req.getStatus() != null && !req.getStatus().isBlank()) {
+        // Only apply ML status if the user hasn't already manually changed it from PENDING —
+        // prevents enrichment from overwriting a user's COMPLETED/IN_PROGRESS update
+        if (req.getStatus() != null && !req.getStatus().isBlank()
+                && task.getStatus() == Task.Status.PENDING) {
             try { task.setStatus(Task.Status.valueOf(req.getStatus().toUpperCase())); } catch (Exception ignored) {}
         }
 
@@ -145,6 +173,7 @@ public class TaskService {
         }
 
         task.setEnriched(true);
+        task.setInQueue(false);
         taskRepository.save(task);
         log.info("Task {} enriched: title='{}' status={} category={} priority={}",
                 taskId, task.getTitle(), task.getStatus(), task.getCategory(), task.getPriority());

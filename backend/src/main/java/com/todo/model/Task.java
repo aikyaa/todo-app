@@ -51,6 +51,12 @@ public class Task {
     @Column(nullable = false)
     private boolean enriched = false;
 
+    // True while a message for this task is in the Service Bus queue.
+    // Prevents the retry scheduler from re-queuing a task already being processed.
+    @Builder.Default
+    @Column(name = "in_queue", nullable = false)
+    private boolean inQueue = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

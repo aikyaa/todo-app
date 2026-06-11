@@ -16,23 +16,7 @@ A full-stack todo app where you describe tasks in plain English and AI automatic
 ## Architecture
 
 ```
-![architecture](image.png)
-
-Frontend (React)
-    │  HTTP (tasks, auth)
-    │  WebSocket/STOMP (live enrichment updates)
-    ▼
-JWT Filter ──► Controllers ──► TaskService ──► Azure Service Bus (queue)
-                           └──► AuthService ──► JwtService
-                           └──► Repositories ──► PostgreSQL
-
-Azure Service Bus
-    ▼
-Python ML Service (FastAPI)
-    │  Queue Worker picks up task
-    │  Task Agent calls Azure OpenAI (single prompt)
-    └──► HTTP PUT /api/tasks/{id}/enrich ──► TaskService ──► WebSocket push
-```
+Check block-diagram.png
 
 ---
 
@@ -72,14 +56,13 @@ CREATE DATABASE tododb;
 Create `backend/run.ps1` :
 
 ```powershell
-$env:AZURE_SERVICEBUS_CONNECTION_STRING="<your-connection-string>"
-$env:AZURE_SERVICEBUS_QUEUE_NAME="task-queue"
-$env:ENRICH_SECRET="local-enrich-secret"
-mvn spring-boot:run
+cd backend
 ```
 
 ```powershell
-cd backend
+$env:AZURE_SERVICEBUS_CONNECTION_STRING="<your-connection-string>"
+$env:AZURE_SERVICEBUS_QUEUE_NAME="task-queue"
+$env:ENRICH_SECRET="local-enrich-secret"
 mvn spring-boot:run
 ```
 
@@ -148,13 +131,13 @@ Runs on `http://localhost:3000`.
 
 | Variable | Description | Default |
 |---|---|---|
-| `REACT_APP_API_URL` | Backend base URL (baked in at build time) | `http://localhost:8080` |
+| `REACT_APP_API_URL` | Backend base URL | `http://localhost:8080` |
 
 ---
 
-## Live demo
+## Demo
 
-🌐 **App** — ([https://todo-frontend.YOUR-DOMAIN.azurecontainerapps.io](https://todo-frontend.icyrock-e26108ae.eastus.azurecontainerapps.io/))
+🌐 **App** — ([https://todo-frontend.icyrock-e26108ae.eastus.azurecontainerapps.io/](https://todo-frontend.icyrock-e26108ae.eastus.azurecontainerapps.io/))
 
 🎥 **Demo video** — [Google Drive](https://drive.google.com/your-link-here)
 
@@ -208,3 +191,32 @@ Queue worker picks up message (PEEK_LOCK)
 Message acknowledged → deleted from queue
 If processing fails → message abandoned → retried up to 10 times → dead-letter queue
 ```
+
+---
+
+## Edge case handling
+
+### Duplicate queue messages — `inQueue` flag
+When a task is created, `inQueue` is set to `true` before the message is sent to Service Bus. It's cleared to `false` when enrichment completes or the task is marked FAILED. The retry scheduler only picks up tasks where `inQueue = false`, so a task that's already sitting in the queue won't get a second message sent for it.
+
+### Stuck tasks — retry scheduler
+If the ML service is down (or a message is silently lost), a task can sit in PENDING indefinitely. `TaskRetryScheduler` runs every 2 minutes and finds tasks that are `enriched = false`, `inQueue = false`, `status = PENDING`, and haven't been updated in 5+ minutes. It sets `inQueue = true`, resets `updatedAt` (which becomes the new retry clock), and re-sends the message to the queue.
+
+### Dead-letter queue — `DeadLetterProcessor`
+Service Bus moves a message to the dead-letter queue (DLQ) after 10 failed delivery attempts. `DeadLetterProcessor` polls the DLQ every 30 seconds, reads the `taskId` from each message, and calls `TaskService.markFailed()` to set the task to `FAILED` and push a WebSocket update to the user. The `markFailed` method lives in `TaskService` (not `DeadLetterProcessor`) so that `@Transactional` goes through the Spring proxy correctly.
+
+### Queue unavailable at task creation
+If `TaskQueueService.enqueue()` throws (Service Bus is down, queue is full, etc.), the `create()` method catches the exception and immediately marks the task `FAILED` so the user gets a visible error card rather than a task stuck on "processing" forever.
+
+### Concurrent status overwrite protection
+The ML pipeline may finish enrichment after the user has already manually updated a task's status. The `enrich()` method only applies the ML-returned status when the current status is still `PENDING` — it won't overwrite `IN_PROGRESS` or `COMPLETED` with whatever the LLM guessed.
+
+### WebSocket infinite reconnect on expired JWT
+The STOMP client's `beforeConnect` callback decodes the JWT expiry from the token payload (base64, no verification needed client-side) before each reconnect attempt. If the token is expired or missing, `client.deactivate()` is called immediately and the user is redirected to the login screen — preventing an infinite loop of 401-rejected connections.
+
+---
+
+## Design notes
+
+### WebSocket vs SSE
+This app uses WebSocket (STOMP over SockJS) for server-to-client task updates. In practice, all real-time communication flows in one direction only — the server pushes enriched task data to the browser; the browser never sends data over the socket. **Server-Sent Events (SSE)** would be a simpler and more appropriate fit for this pattern: SSE is a native browser API, requires no extra protocol layer, handles reconnection automatically, and works over plain HTTP/2 without the overhead of a WebSocket upgrade. The main trade-off is that SSE is strictly unidirectional, but since the frontend already uses REST for all writes, that's not a constraint here.

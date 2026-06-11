@@ -172,6 +172,19 @@ export default function App() {
       webSocketFactory: () =>
         new SockJS((process.env.REACT_APP_API_URL || 'http://localhost:8080') + '/ws'),
       connectHeaders: { Authorization: `Bearer ${token}` },
+      reconnectDelay: 5000,
+      beforeConnect: () => {
+        const t = localStorage.getItem('token');
+        if (!t) { client.deactivate(); return; }
+        try {
+          const payload = JSON.parse(atob(t.split('.')[1]));
+          if (payload.exp * 1000 < Date.now()) {
+            client.deactivate();
+            localStorage.removeItem('token');
+            window.location.reload();
+          }
+        } catch { client.deactivate(); }
+      },
       onConnect: () => {
         client.subscribe('/user/queue/tasks', message => {
           const updated = JSON.parse(message.body);

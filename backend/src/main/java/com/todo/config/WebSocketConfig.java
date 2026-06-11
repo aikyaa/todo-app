@@ -73,7 +73,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             log.warn("WebSocket JWT validation failed: {}", e.getMessage());
                         }
                     } else {
-                        log.warn("WebSocket CONNECT with no Authorization header");
+                        log.warn("WebSocket CONNECT with no Authorization header — rejecting");
+                        return null; // drop the connection
                     }
                 }
                 return message;
