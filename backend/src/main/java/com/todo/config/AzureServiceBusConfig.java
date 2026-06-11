@@ -2,9 +2,7 @@ package com.todo.config;
 
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.messaging.servicebus.ServiceBusClientBuilder;
-import com.azure.messaging.servicebus.ServiceBusReceiverClient;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
-import com.azure.messaging.servicebus.models.ServiceBusReceiveMode;
 import com.azure.security.keyvault.secrets.SecretClient;
 import com.azure.security.keyvault.secrets.SecretClientBuilder;
 import org.slf4j.Logger;
@@ -38,24 +36,6 @@ public class AzureServiceBusConfig {
                 .connectionString(cs)
                 .sender()
                 .queueName(queueName)
-                .buildClient();
-    }
-
-    /**
-     * Receiver pointed at the dead-letter sub-queue.
-     * Used by DeadLetterProcessor to drain failed messages and mark tasks FAILED.
-     */
-    @Bean
-    public ServiceBusReceiverClient deadLetterReceiverClient() {
-        String cs  = resolveConnectionString();
-        // Azure Service Bus dead-letter sub-queue path: <queue>/$DeadLetterQueue
-        String dlq = queueName + "/$DeadLetterQueue";
-        log.info("Building Service Bus DLQ receiver for path '{}'", dlq);
-        return new ServiceBusClientBuilder()
-                .connectionString(cs)
-                .receiver()
-                .queueName(dlq)
-                .receiveMode(ServiceBusReceiveMode.PEEK_LOCK)
                 .buildClient();
     }
 

@@ -50,20 +50,30 @@ public class DataSourceConfig {
 
     private String resolvePassword() {
         if (kvUrl != null && !kvUrl.isEmpty()) {
-            log.info("Fetching db-password from Key Vault: {}", kvUrl);
-            try {
-                SecretClient client = new SecretClientBuilder()
-                        .vaultUrl(kvUrl)
-                        .credential(new DefaultAzureCredentialBuilder().build())
-                        .buildClient();
-                String value = client.getSecret("pg-password").getValue();
-                log.info("Successfully fetched pg-password from Key Vault.");
-                return value;
-            } catch (Exception e) {
-                log.warn("Failed to fetch db-password from Key Vault ({}). Using fallback.", e.getMessage());
+            // Retry up to 5 times with 3s delay — managed identity IMDS endpoint
+            // may not be warm immediately at container startup
+            int attempts = 5;
+            for (int i = 1; i <= attempts; i++) {
+                try {
+                    log.info("Fetching pg-password from Key Vault (attempt {}/{})", i, attempts);
+                    SecretClient client = new SecretClientBuilder()
+                            .vaultUrl(kvUrl)
+                            .credential(new DefaultAzureCredentialBuilder().build())
+                            .buildClient();
+                    String value = client.getSecret("pg-password").getValue();
+                    log.info("Successfully fetched pg-password from Key Vault.");
+                    return value;
+                } catch (Exception e) {
+                    log.warn("Attempt {}/{} failed to fetch pg-password from Key Vault: {}", i, attempts, e.getMessage());
+                    if (i < attempts) {
+                        try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    } else {
+                        throw new IllegalStateException("Cannot start — failed to fetch pg-password from Key Vault after " + attempts + " attempts: " + e.getMessage(), e);
+                    }
+                }
             }
         }
-        log.info("Using DB_PASSWORD env var fallback for db-password.");
+        log.info("Using DB_PASSWORD env var fallback for pg-password.");
         return passwordFallback;
     }
 }

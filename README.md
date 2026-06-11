@@ -16,7 +16,7 @@ A full-stack todo app where you describe tasks in plain English and AI automatic
 ## Architecture
 
 ```
-Check block-diagram.png
+![Block diagram](block-diagram.png)
 
 ---
 
@@ -139,7 +139,9 @@ Runs on `http://localhost:3000`.
 
 🌐 **App** — https://polite-plant-08ce7cd0f.7.azurestaticapps.net
 
-🎥 **Demo video** — 
+🎥 **Demo video** — https://drive.google.com/file/d/1Zn2v4cyECCTl1lPj4FkOjr4q7iz4rsqS/view?usp=sharing
+
+![App Screenshot](browser-console-snippet.png)
 
 ---
 
@@ -189,7 +191,8 @@ Queue worker picks up message (PEEK_LOCK)
     → Frontend patches task in-place — card updates live
 
 Message acknowledged → deleted from queue
-If processing fails → message abandoned → retried up to 10 times → dead-letter queue
+If processing fails → message abandoned → retried up to 10 times → dead-letter queue (unprocessed)
+If task stays stuck → retry scheduler re-queues it after 5 minutes
 ```
 
 ---
@@ -199,8 +202,8 @@ If processing fails → message abandoned → retried up to 10 times → dead-le
 ### Stuck tasks — retry scheduler
 If the ML service is down (or a message is silently lost), a task can sit in PENDING indefinitely. `TaskRetryScheduler` runs every 2 minutes and finds tasks that are `enriched = false`, `inQueue = false`, `status = PENDING`, and haven't been updated in 5+ minutes. It sets `inQueue = true`, resets `updatedAt` (which becomes the new retry clock), and re-sends the message to the queue.
 
-### Dead-letter queue — `DeadLetterProcessor`
-Service Bus moves a message to the dead-letter queue (DLQ) after 10 failed delivery attempts. `DeadLetterProcessor` polls the DLQ every 30 seconds, reads the `taskId` from each message, and calls `TaskService.markFailed()` to set the task to `FAILED` and push a WebSocket update to the user. The `markFailed` method lives in `TaskService` (not `DeadLetterProcessor`) so that `@Transactional` goes through the Spring proxy correctly.
+### Dead-letter queue
+Service Bus moves a message to the dead-letter queue (DLQ) after 10 failed delivery attempts. Messages that end up in the DLQ are currently left unprocessed — the retry scheduler catches stuck tasks before they reach this point. DLQ polling was previously implemented via `DeadLetterProcessor` but was removed due to an SDK conflict between the `EntityPath` embedded in the connection string and the DLQ sub-queue path (`task-queue/$DeadLetterQueue`).
 
 ### Queue unavailable at task creation
 If `TaskQueueService.enqueue()` throws (Service Bus is down, queue is full, etc.), the `create()` method catches the exception and immediately marks the task `FAILED` so the user gets a visible error card rather than a task stuck on "processing" forever.
@@ -217,3 +220,4 @@ The STOMP client's `beforeConnect` callback decodes the JWT expiry from the toke
 
 ### WebSocket vs SSE
 This app uses WebSocket (STOMP over SockJS) for server-to-client task updates. In practice, all real-time communication flows in one direction only — the server pushes enriched task data to the browser; the browser never sends data over the socket. **Server-Sent Events (SSE)** would be a simpler and more appropriate fit for this pattern: SSE is a native browser API, requires no extra protocol layer, handles reconnection automatically, and works over plain HTTP/2 without the overhead of a WebSocket upgrade. The main trade-off is that SSE is strictly unidirectional, but since the frontend already uses REST for all writes, that's not a constraint here.
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
